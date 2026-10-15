@@ -168,7 +168,7 @@ export const TransactionIntelligence: React.FC<TransactionIntelligenceProps> = (
 
   return (
     <ErrorBoundary fallbackTitle="Transactions Module Error">
-      <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
         <PageHeader
           title="Transactions"
           subtitle="Audit, search, and analyze financial transaction flows with calibrated risk assessments"

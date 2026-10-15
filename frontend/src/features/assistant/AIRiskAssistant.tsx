@@ -236,7 +236,7 @@ export const AIRiskAssistant: React.FC<AIRiskAssistantProps> = ({ currentUserId 
 
   return (
     <ErrorBoundary fallbackTitle="Risk Assistant Safeguard">
-      <div className="p-4 md:p-6 space-y-5 max-w-5xl mx-auto flex flex-col h-[calc(100vh-5rem)]">
+      <div className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 max-w-5xl mx-auto flex flex-col h-[calc(100vh-4rem)] md:h-[calc(100vh-5rem)]">
         <PageHeader
           title="Risk Assistant"
           subtitle="Natural language investigation copilot grounded in AML/KYC policies and regulatory manuals"
@@ -315,18 +315,18 @@ export const AIRiskAssistant: React.FC<AIRiskAssistantProps> = ({ currentUserId 
         <div className="space-y-1.5 shrink-0">
           <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
             <span>RECOMMENDED INQUIRIES</span>
-            <span className="text-[10px] text-slate-500">Click to populate</span>
+            <span className="text-[10px] text-slate-500">Swipe or click to populate</span>
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex sm:flex-wrap overflow-x-auto pb-1 gap-1.5 scrollbar-thin">
             {SUGGESTED_QUERIES.map((q, idx) => (
               <button
                 key={idx}
                 onClick={() => handleSend(q)}
                 disabled={loading}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#11192e] hover:bg-[#16213d] border border-slate-800/80 hover:border-sky-500/50 text-[11px] text-slate-300 transition cursor-pointer disabled:opacity-40"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#11192e] hover:bg-[#16213d] border border-slate-800/80 hover:border-sky-500/50 text-[11px] text-slate-300 transition cursor-pointer disabled:opacity-40 shrink-0 sm:shrink"
               >
                 <Sparkles className="h-3 w-3 text-sky-400 shrink-0" />
-                <span className="truncate max-w-xs">{q}</span>
+                <span className="truncate max-w-[240px] sm:max-w-xs">{q}</span>
               </button>
             ))}
           </div>
@@ -438,15 +438,15 @@ export const AIRiskAssistant: React.FC<AIRiskAssistantProps> = ({ currentUserId 
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask a question grounded in AML/KYC policies or fraud typologies..."
-            className="flex-1 bg-[#0c1221] border border-slate-700/80 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 shadow-sm font-sans"
+            className="flex-1 bg-[#0c1221] border border-slate-700/80 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 shadow-sm font-sans"
           />
           <button
             type="submit"
             disabled={loading || !input.trim()}
-            className="px-5 py-3 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white font-medium text-xs flex items-center gap-2 shadow-lg shadow-sky-600/20 transition cursor-pointer"
+            className="px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white font-medium text-xs flex items-center justify-center gap-1.5 shadow-lg shadow-sky-600/20 transition cursor-pointer shrink-0"
           >
             <Send className="h-4 w-4" />
-            <span>Send</span>
+            <span className="hidden sm:inline">Send</span>
           </button>
         </form>
       </div>

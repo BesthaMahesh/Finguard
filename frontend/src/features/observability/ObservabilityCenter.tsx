@@ -78,7 +78,7 @@ export const ObservabilityCenter: React.FC = () => {
 
   if (error || !obs) {
     return (
-      <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
         <PageHeader
           title="System Health"
           subtitle="Request and workflow diagnostics, latency telemetry, and service operational status"
@@ -121,7 +121,7 @@ export const ObservabilityCenter: React.FC = () => {
   }
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       <PageHeader
         title="System Health"
         subtitle="Request and workflow diagnostics, latency telemetry, and service operational status"

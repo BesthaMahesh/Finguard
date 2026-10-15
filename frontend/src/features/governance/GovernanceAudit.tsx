@@ -60,7 +60,7 @@ export const GovernanceAudit: React.FC = () => {
   });
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       <PageHeader
         title="Security & Audit"
         subtitle="Structured audit trail, authentication events, and role-based permissions matrix"

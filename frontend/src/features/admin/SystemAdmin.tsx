@@ -179,7 +179,7 @@ export const SystemAdmin: React.FC<SystemAdminProps> = ({ currentUser }) => {
   });
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       <PageHeader
         title="Administration"
         subtitle="User access management, connected system actions, and platform configuration"
@@ -188,7 +188,7 @@ export const SystemAdmin: React.FC<SystemAdminProps> = ({ currentUser }) => {
       />
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-800 space-x-4 text-xs font-medium">
+      <div className="flex border-b border-slate-800 space-x-4 text-xs font-medium overflow-x-auto scrollbar-thin">
         <button
           onClick={() => setActiveTab('users')}
           className={`pb-3 flex items-center gap-2 border-b-2 transition cursor-pointer ${

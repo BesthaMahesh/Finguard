@@ -15,6 +15,7 @@ import { RoleGuard } from './components/common/RoleGuard';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { UserProfile, UserRole } from './types';
 import { api, setAuthToken } from './services/api';
+import { LayoutDashboard, Search, Briefcase, Bot, Menu } from 'lucide-react';
 
 export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -24,6 +25,7 @@ export function App() {
   // Navigation & Shell States
   const [currentTab, setCurrentTab] = useState<string>('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
   const [workbenchTxId, setWorkbenchTxId] = useState<number | null>(null);
 
   // Check existing session token on application mount
@@ -110,17 +112,20 @@ export function App() {
 
   return (
     <div className="flex h-screen w-screen bg-[#0a0f1d] text-slate-100 overflow-hidden font-sans">
-      {/* 9-Layer Architecture Left Sidebar */}
+      {/* 9-Layer Architecture Left Sidebar (Responsive Drawer on Mobile) */}
       <Sidebar
         currentTab={currentTab}
         onSelectTab={(tab) => {
           setWorkbenchTxId(null);
           setCurrentTab(tab);
+          setMobileSidebarOpen(false);
         }}
         userRole={userRole}
         openCasesCount={25}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        mobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
       />
 
       {/* Main Content Viewport */}
@@ -130,12 +135,12 @@ export function App() {
           currentTab={currentTab}
           user={user}
           onLogout={handleLogout}
-          onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)}
+          onToggleSidebar={() => setMobileSidebarOpen((prev) => !prev)}
           onGlobalSearch={handleGlobalSearch}
         />
 
         {/* Dynamic Feature Page Routing with Role-Based Protection */}
-        <main className="flex-1 overflow-y-auto bg-[#070b14]">
+        <main className="flex-1 overflow-y-auto bg-[#070b14] pb-16 md:pb-0">
           <ErrorBoundary
             key={currentTab}
             resetKey={currentTab}
@@ -189,6 +194,78 @@ export function App() {
             )}
           </ErrorBoundary>
         </main>
+
+        {/* Mobile Bottom Navigation Bar (Visible only on screens < md) */}
+        <nav className="md:hidden fixed bottom-0 inset-x-0 bg-[#090e1a]/95 backdrop-blur-md border-t border-slate-800/90 z-30 px-1 py-1 flex items-center justify-around shadow-2xl select-none">
+          <button
+            onClick={() => {
+              setWorkbenchTxId(null);
+              setCurrentTab('overview');
+              setMobileSidebarOpen(false);
+            }}
+            className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl text-[10px] font-medium transition cursor-pointer ${
+              currentTab === 'overview' ? 'text-sky-400 bg-sky-950/50' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <LayoutDashboard className="h-4 w-4 mb-0.5" />
+            <span>Dashboard</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setWorkbenchTxId(null);
+              setCurrentTab('transactions');
+              setMobileSidebarOpen(false);
+            }}
+            className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl text-[10px] font-medium transition cursor-pointer ${
+              currentTab === 'transactions' ? 'text-sky-400 bg-sky-950/50' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Search className="h-4 w-4 mb-0.5" />
+            <span>Ledger</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setWorkbenchTxId(null);
+              setCurrentTab('investigations');
+              setMobileSidebarOpen(false);
+            }}
+            className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-xl text-[10px] font-medium transition cursor-pointer ${
+              currentTab === 'investigations' ? 'text-sky-400 bg-sky-950/50' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Briefcase className="h-4 w-4 mb-0.5" />
+            <span>Cases</span>
+            <span className="absolute top-0.5 right-1.5 h-3.5 px-1 rounded-full bg-rose-600 text-white text-[9px] font-bold flex items-center justify-center">
+              25
+            </span>
+          </button>
+
+          <button
+            onClick={() => {
+              setWorkbenchTxId(null);
+              setCurrentTab('assistant');
+              setMobileSidebarOpen(false);
+            }}
+            className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl text-[10px] font-medium transition cursor-pointer ${
+              currentTab === 'assistant' ? 'text-sky-400 bg-sky-950/50' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Bot className="h-4 w-4 mb-0.5" />
+            <span>Assistant</span>
+          </button>
+
+          <button
+            onClick={() => setMobileSidebarOpen((prev) => !prev)}
+            className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl text-[10px] font-medium transition cursor-pointer ${
+              mobileSidebarOpen ? 'text-sky-400 bg-sky-950/50' : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Menu className="h-4 w-4 mb-0.5" />
+            <span>Menu</span>
+          </button>
+        </nav>
       </div>
     </div>
   );

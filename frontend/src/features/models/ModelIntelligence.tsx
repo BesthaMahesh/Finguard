@@ -56,7 +56,7 @@ export const ModelIntelligence: React.FC = () => {
 
   if (loading || !evaluation) {
     return (
-      <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
         <PageHeader
           title="Detection Performance"
           subtitle="Fraud detection quality, discrimination scores, confusion matrix, and feature impact"
@@ -80,7 +80,7 @@ export const ModelIntelligence: React.FC = () => {
     (cm.true_positives || 0);
 
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       <PageHeader
         title="Detection Performance"
         subtitle="Fraud detection quality, discrimination scores, confusion matrix, and feature impact"

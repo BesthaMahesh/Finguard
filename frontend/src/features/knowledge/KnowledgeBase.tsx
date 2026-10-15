@@ -191,7 +191,7 @@ export const KnowledgeBase: React.FC = () => {
   ];
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       {/* Top Banner Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div>
@@ -214,11 +214,11 @@ export const KnowledgeBase: React.FC = () => {
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => handleRefreshAll(false)}
             disabled={isIngesting}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-medium transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${isIngesting ? 'animate-spin text-sky-400' : ''}`} />
             <span>Incremental Ingest</span>
@@ -226,14 +226,14 @@ export const KnowledgeBase: React.FC = () => {
           <button
             onClick={() => handleRefreshAll(true)}
             disabled={isIngesting}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs font-medium transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-lg bg-sky-600/20 hover:bg-sky-600/30 text-sky-300 border border-sky-500/30 text-xs font-medium transition-colors disabled:opacity-50"
           >
             <Layers className="h-3.5 w-3.5 text-sky-400" />
             <span>Re-index All</span>
           </button>
           <button
             onClick={() => setShowUploadModal(true)}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold shadow-lg shadow-sky-600/20 transition-all"
+            className="flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold shadow-lg shadow-sky-600/20 transition-all"
           >
             <Upload className="h-3.5 w-3.5" />
             <span>Upload Document</span>
@@ -262,7 +262,7 @@ export const KnowledgeBase: React.FC = () => {
       )}
 
       {/* Overview Metric Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 backdrop-blur-sm">
           <div className="flex items-center justify-between text-slate-400 text-xs mb-1.5">
             <span>Total Documents</span>

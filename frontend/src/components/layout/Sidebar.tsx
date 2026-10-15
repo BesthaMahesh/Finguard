@@ -14,6 +14,7 @@ import {
   ChevronRight,
   ShieldCheck,
   Lock,
+  X,
 } from 'lucide-react';
 import { UserRole } from '../../types';
 
@@ -24,6 +25,8 @@ interface SidebarProps {
   openCasesCount?: number;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
 interface NavItem {
@@ -41,6 +44,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   openCasesCount = 0,
   collapsed = false,
   onToggleCollapse,
+  mobileOpen = false,
+  onCloseMobile,
 }) => {
   const normRole = (userRole || 'USER').toUpperCase();
   const isAdmin = normRole === 'ADMIN' || normRole === 'ADMINISTRATOR';
@@ -109,19 +114,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const navSections = isAdmin ? adminSections : standardUserSections;
 
   return (
-    <aside
-      className={`${
-        collapsed ? 'w-16' : 'w-64'
-      } bg-[#090e1a] border-r border-slate-800/80 flex flex-col shrink-0 h-screen sticky top-0 transition-all duration-200 select-none z-40`}
-    >
-      {/* Brand Header */}
-      <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800/80">
-        <div className="flex items-center gap-3 overflow-hidden">
-          <div className="h-9 w-9 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
-            <ShieldAlert className="h-5 w-5" />
-          </div>
-          {!collapsed && (
-            <div className="overflow-hidden">
+    <>
+      {/* Mobile Drawer Backdrop */}
+      {mobileOpen && (
+        <div
+          onClick={onCloseMobile}
+          className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 md:hidden transition-opacity duration-200"
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Main Sidebar Shell (Slide-over drawer on mobile, static on desktop) */}
+      <aside
+        className={`
+          fixed inset-y-0 left-0 z-50 w-72 bg-[#090e1a] border-r border-slate-800/80 flex flex-col shadow-2xl transition-transform duration-200 ease-in-out select-none
+          ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}
+          md:static md:sticky md:top-0 md:h-screen md:z-40 md:shadow-none md:translate-x-0
+          ${collapsed ? 'md:w-16' : 'md:w-64'}
+        `}
+      >
+        {/* Brand Header */}
+        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800/80">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="h-9 w-9 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 shrink-0">
+              <ShieldAlert className="h-5 w-5" />
+            </div>
+            <div className={`${collapsed ? 'md:hidden' : 'block'} overflow-hidden`}>
               <div className="font-bold text-slate-100 tracking-tight text-sm flex items-center gap-1.5">
                 FinGuard
                 <span className="text-[9px] uppercase font-mono px-1.5 py-0.2 bg-sky-950 text-sky-400 border border-sky-800 rounded font-semibold">
@@ -132,54 +150,67 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 Risk Intelligence
               </div>
             </div>
-          )}
+          </div>
+
+          <div className="flex items-center gap-1">
+            {/* Mobile Close Button */}
+            {onCloseMobile && (
+              <button
+                onClick={onCloseMobile}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 md:hidden transition cursor-pointer"
+                title="Close Navigation"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
+
+            {/* Desktop Collapse/Expand Button */}
+            {onToggleCollapse && (
+              <button
+                onClick={onToggleCollapse}
+                className="hidden md:flex p-1 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-800/60 transition cursor-pointer"
+                title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              >
+                {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+              </button>
+            )}
+          </div>
         </div>
 
-        {onToggleCollapse && (
-          <button
-            onClick={onToggleCollapse}
-            className="p-1 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-800/60 transition cursor-pointer"
-            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          </button>
-        )}
-      </div>
-
-      {/* Navigation Groups */}
-      <nav className="flex-1 p-2 space-y-4 overflow-y-auto">
-        {navSections.map((section, sIdx) => (
-          <div key={sIdx} className="space-y-1">
-            {!collapsed && (
-              <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+        {/* Navigation Groups */}
+        <nav className="flex-1 p-2 space-y-4 overflow-y-auto">
+          {navSections.map((section, sIdx) => (
+            <div key={sIdx} className="space-y-1">
+              <div className={`px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400 ${collapsed ? 'md:hidden' : 'block'}`}>
                 {section.group}
               </div>
-            )}
-            {section.items.map((item) => {
-              const Icon = item.icon;
-              const isActive = currentTab === item.id;
-              const isLockedForUser = item.adminOnly && !isAdmin;
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentTab === item.id;
+                const isLockedForUser = item.adminOnly && !isAdmin;
 
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => onSelectTab(item.id)}
-                  title={collapsed ? item.label : undefined}
-                  className={`w-full flex items-center ${
-                    collapsed ? 'justify-center px-2' : 'justify-between px-3'
-                  } py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-sky-600/15 text-sky-300 border border-sky-500/30 shadow-sm shadow-sky-950/40'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 overflow-hidden">
-                    <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-sky-400' : 'text-slate-500'}`} />
-                    {!collapsed && <span className="truncate">{item.label}</span>}
-                  </div>
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      onSelectTab(item.id);
+                      if (onCloseMobile) onCloseMobile();
+                    }}
+                    title={collapsed ? item.label : undefined}
+                    className={`w-full flex items-center ${
+                      collapsed ? 'md:justify-center md:px-2 justify-between px-3' : 'justify-between px-3'
+                    } py-2.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-sky-600/15 text-sky-300 border border-sky-500/30 shadow-sm shadow-sky-950/40'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 overflow-hidden">
+                      <Icon className={`h-4 w-4 shrink-0 ${isActive ? 'text-sky-400' : 'text-slate-500'}`} />
+                      <span className={`${collapsed ? 'md:hidden' : 'block'} truncate`}>{item.label}</span>
+                    </div>
 
-                  {!collapsed && (
-                    <div className="flex items-center gap-1">
+                    <div className={`${collapsed ? 'md:hidden' : 'flex'} items-center gap-1`}>
                       {isLockedForUser && (
                         <span className="p-0.5 text-slate-600" title="Admin only">
                           <Lock className="h-3 w-3" />
@@ -191,18 +222,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         </span>
                       )}
                     </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </nav>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </nav>
 
-      {/* System Status Footnote */}
-      <div className="p-3 border-t border-slate-800/80 bg-[#070b14]/80">
-        {!collapsed ? (
-          <div className="rounded-lg border border-slate-800/80 bg-slate-900/60 p-2.5 text-xs">
+        {/* System Status Footnote */}
+        <div className="p-3 border-t border-slate-800/80 bg-[#070b14]/80">
+          <div className={`${collapsed ? 'md:hidden' : 'block'} rounded-lg border border-slate-800/80 bg-slate-900/60 p-2.5 text-xs`}>
             <div className="flex items-center justify-between text-slate-400 text-[11px] mb-1">
               <span className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -220,12 +249,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
             )}
           </div>
-        ) : (
-          <div className="flex justify-center" title="FinGuard Risk Intelligence Platform Active">
-            <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
-          </div>
-        )}
-      </div>
-    </aside>
+          {collapsed && (
+            <div className="hidden md:flex justify-center" title="FinGuard Risk Intelligence Platform Active">
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse" />
+            </div>
+          )}
+        </div>
+      </aside>
+    </>
   );
 };
