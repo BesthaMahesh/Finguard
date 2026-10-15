@@ -1,0 +1,119 @@
+{
+  "model_version": "v1.2.0-rf-enterprise",
+  "algorithm": "RandomForestClassifier(balanced_subsample, max_depth=10)",
+  "trained_at": "2026-10-12T14:33:24.301335",
+  "test_sample_count": 27055,
+  "test_fraud_count": 54,
+  "pr_auc": 0.9449,
+  "roc_auc": 0.9844,
+  "precision": 1.0,
+  "recall": 0.8889,
+  "f1_score": 0.9412,
+  "threshold": 0.65,
+  "confusion_matrix": {
+    "true_negatives": 27001,
+    "false_positives": 0,
+    "false_negatives": 6,
+    "true_positives": 48
+  },
+  "feature_importance": [
+    {
+      "feature": "orig_balance_error",
+      "importance": 0.29132885800728475
+    },
+    {
+      "feature": "is_account_cleared",
+      "importance": 0.1915480206056721
+    },
+    {
+      "feature": "orig_balance_delta",
+      "importance": 0.15281067357222375
+    },
+    {
+      "feature": "dest_is_merchant",
+      "importance": 0.05809632477037581
+    },
+    {
+      "feature": "hour_of_day",
+      "importance": 0.05705978576148141
+    },
+    {
+      "feature": "amount_log",
+      "importance": 0.047026326498771504
+    },
+    {
+      "feature": "dest_balance_delta",
+      "importance": 0.03797319180208909
+    },
+    {
+      "feature": "type_PAYMENT",
+      "importance": 0.03770414153056974
+    },
+    {
+      "feature": "type_TRANSFER",
+      "importance": 0.034921137039447284
+    },
+    {
+      "feature": "dest_balance_error",
+      "importance": 0.025583641318981352
+    },
+    {
+      "feature": "is_dest_zero_init",
+      "importance": 0.025243839510091216
+    },
+    {
+      "feature": "type_CASH_OUT",
+      "importance": 0.017739935110636068
+    },
+    {
+      "feature": "is_zero_orig",
+      "importance": 0.011442439761875114
+    },
+    {
+      "feature": "type_CASH_IN",
+      "importance": 0.010850893538575768
+    },
+    {
+      "feature": "type_DEBIT",
+      "importance": 0.0006707911719249067
+    }
+  ],
+  "threshold_analysis": [
+    {
+      "threshold": 0.2,
+      "precision": 0.75,
+      "recall": 0.9444,
+      "f1_score": 0.8361
+    },
+    {
+      "threshold": 0.35,
+      "precision": 0.9623,
+      "recall": 0.9444,
+      "f1_score": 0.9533
+    },
+    {
+      "threshold": 0.5,
+      "precision": 1.0,
+      "recall": 0.9259,
+      "f1_score": 0.9615
+    },
+    {
+      "threshold": 0.65,
+      "precision": 1.0,
+      "recall": 0.8889,
+      "f1_score": 0.9412
+    },
+    {
+      "threshold": 0.75,
+      "precision": 1.0,
+      "recall": 0.7963,
+      "f1_score": 0.8866
+    },
+    {
+      "threshold": 0.85,
+      "precision": 1.0,
+      "recall": 0.6667,
+      "f1_score": 0.8
+    }
+  ]
+}

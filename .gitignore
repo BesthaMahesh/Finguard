@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+
+# Virtual Environments
+venv/
+.venv/
+ENV/
+
+# Data and Models
+datasets/*.csv
+*.csv
+!datasets/sample_paysim_demo.csv
+models/*.joblib
+!models/finguard_rf_model.joblib
+!models/shap_background.joblib
+models/*.pkl
+*.sqlite
+*.db
+backend/chroma_db/
+chroma_db/
+
+# Node & Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+.npm
+*.log
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env

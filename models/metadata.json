@@ -1,0 +1,29 @@
+{
+  "model_id": "finguard-rf-v1",
+  "model_type": "Supervised Binary Classifier",
+  "target": "isFraud (PaySim Synthetic Financial Risk)",
+  "feature_count": 15,
+  "features": [
+    "amount_log",
+    "orig_balance_delta",
+    "dest_balance_delta",
+    "orig_balance_error",
+    "dest_balance_error",
+    "is_zero_orig",
+    "is_dest_zero_init",
+    "is_account_cleared",
+    "dest_is_merchant",
+    "hour_of_day",
+    "type_CASH_OUT",
+    "type_TRANSFER",
+    "type_PAYMENT",
+    "type_CASH_IN",
+    "type_DEBIT"
+  ],
+  "training_samples": 126252,
+  "validation_samples": 27054,
+  "test_samples": 27055,
+  "leakage_guard_status": "PASSED - No target leakage verified",
+  "explainability": "TreeSHAP Compatible",
+  "created_at": "2026-10-12T14:33:24.301395"
+}
