@@ -8,8 +8,8 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     
     API_V1_STR: str = "/api/v1"
-    BACKEND_HOST: str = "0.0.0.0"
-    BACKEND_PORT: int = 8000
+    BACKEND_HOST: str = os.environ.get("HOST", "0.0.0.0")
+    BACKEND_PORT: int = int(os.environ.get("PORT", 8000))
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",

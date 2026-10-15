@@ -5,7 +5,7 @@ services:
     region: oregon
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    startCommand: python run.py
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
@@ -13,6 +13,8 @@ services:
         value: production
       - key: DEBUG
         value: false
+      - key: USE_LIGHTWEIGHT_EMBEDDINGS
+        value: "true"
       - key: DATABASE_URL
         value: sqlite:///./finguard.db
       - key: GROQ_API_KEY

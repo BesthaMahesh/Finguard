@@ -63,7 +63,23 @@ async def observability_middleware(request: Request, call_next):
             content={"error": "An internal server error occurred.", "status": "INTERNAL_ERROR"}
         )
 
-# Health & Readiness Checks
+# Root & Health Checks for Cloud Deployment (Render / Vercel / Railway)
+@app.get("/", tags=["Health & System"])
+def root_check():
+    return {
+        "status": "HEALTHY",
+        "service": settings.PROJECT_NAME,
+        "version": "1.2.0"
+    }
+
+@app.get("/health", tags=["Health & System"])
+def health_endpoint():
+    return {
+        "status": "HEALTHY",
+        "service": settings.PROJECT_NAME,
+        "version": "1.2.0"
+    }
+
 @app.get("/api/v1/health", tags=["Health & System"])
 def health_check():
     return {
@@ -96,21 +112,15 @@ def on_startup():
     except Exception as e:
         print(f"[FinGuard] Warning: Failed to initialize default accounts on startup: {e}")
 
-    # Pre-warm ML Model Service
+    # Ensure ML Model Service is ready
     try:
         from backend.ml.model_service import model_service
         model_service._ensure_model()
     except Exception as e:
-        print(f"[FinGuard] Warning: ML model pre-warm skipped: {e}")
-
-    # Pre-warm Vector Knowledge Store & Embedder
-    try:
-        from backend.rag.retriever import PolicyRetriever
-        # Quick 1-token pre-warm query to load weights into memory once
-        PolicyRetriever.search_policies(query="FinGuard startup check", top_k=1)
-    except Exception as e:
-        print(f"[FinGuard] Warning: Knowledge RAG pre-warm: {e}")
+        print(f"[FinGuard] Warning: ML model initialization skipped: {e}")
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("backend.main:app", host=settings.BACKEND_HOST, port=settings.BACKEND_PORT, reload=settings.DEBUG)
+    port = int(os.environ.get("PORT", settings.BACKEND_PORT))
+    host = os.environ.get("HOST", settings.BACKEND_HOST)
+    uvicorn.run("backend.main:app", host=host, port=port, reload=settings.DEBUG)
