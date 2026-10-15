@@ -211,12 +211,32 @@ def chat_with_risk_assistant(
 
     if not reply_text:
         if citations:
-            reply_text = (
-                f"### Compliance Policy Guidance ({citations[0]['document_id']} — {citations[0]['section']})\n\n"
-                f"{citations[0]['excerpt']}\n\n"
-                "- **Human Oversight**: Investigators must follow the 4-Eyes principle for any transaction scoring above the 70.0 risk threshold.\n"
-                "- **Next Step**: Corroborate counterparty beneficiary details in the transaction ledger."
-            )
+            top_c = citations[0]
+            sec = top_c.get("section", "Standard Compliance Guidance")
+            doc = top_c.get("document_id", "POLICY")
+            src = top_c.get("source_file", "Official Manual")
+            excerpt = top_c.get("excerpt", "").strip()
+
+            lines = [
+                f"### Grounded Compliance Guidance: {sec}\n",
+                f"**Governing Policy:** `{doc}` ({src})\n",
+                f"{excerpt}\n"
+            ]
+
+            if len(citations) > 1:
+                second = citations[1]
+                sec2 = second.get("section", "Related Standard")
+                doc2 = second.get("document_id", "POLICY")
+                excerpt2 = second.get("excerpt", "").strip()
+                lines.append(f"\n#### Corroborating Standard: {sec2} (`{doc2}`)\n")
+                lines.append(f"{excerpt2}\n")
+
+            lines.append("\n#### Investigator Operating Protocol:")
+            lines.append("- **Audit Log**: Ensure all inquiry actions and case reviews are recorded with timestamp and analyst ID.")
+            lines.append("- **Dual Authorization**: Operational account actions require sign-off under the 4-Eyes Governance Principle.")
+            lines.append("- **SAR Escalation**: If suspicion remains validated after review, escalate the case docket for formal regulatory reporting.")
+
+            reply_text = "\n".join(lines)
         else:
             reply_text = (
                 "### Insufficient Policy Evidence\n\n"
