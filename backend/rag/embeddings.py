@@ -12,7 +12,7 @@ _CACHED_ST_MODELS = {}
 
 def get_cached_sentence_transformer(model_name: str = "all-MiniLM-L6-v2"):
     global _CACHED_ST_MODELS
-    if os.environ.get("USE_LIGHTWEIGHT_EMBEDDINGS", "true").lower() in ("true", "1", "yes"):
+    if os.environ.get("USE_LIGHTWEIGHT_EMBEDDINGS", "false").lower() in ("true", "1", "yes"):
         _CACHED_ST_MODELS[model_name] = None
         return None
 

@@ -13,8 +13,6 @@ services:
         value: production
       - key: DEBUG
         value: false
-      - key: USE_LIGHTWEIGHT_EMBEDDINGS
-        value: "true"
       - key: DATABASE_URL
         value: sqlite:///./finguard.db
       - key: GROQ_API_KEY
