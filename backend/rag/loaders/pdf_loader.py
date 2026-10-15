@@ -1,7 +1,10 @@
 import os
 import logging
 from typing import List, Dict, Any, Tuple
-import pypdf
+try:
+    import pypdf
+except ImportError:
+    pypdf = None
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +40,10 @@ class PDFLoader:
             raise PDFExtractionError(f"PDF file is completely empty (0 bytes): {file_path}")
 
         filename = os.path.basename(file_path)
+        if pypdf is None:
+            raise PDFExtractionError(
+                "pypdf is not installed. To ingest PDF documents, run: pip install pypdf"
+            )
 
         try:
             reader = pypdf.PdfReader(file_path)

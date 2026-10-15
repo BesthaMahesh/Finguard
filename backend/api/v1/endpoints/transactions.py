@@ -21,8 +21,8 @@ def list_transactions(
     status: Optional[str] = Query(None),
     is_fraud: Optional[int] = Query(None),
     search: Optional[str] = Query(None),
-    sort_by: str = Query("id", regex="^(id|amount|risk_score|step|created_at)$"),
-    sort_order: str = Query("desc", regex="^(asc|desc)$"),
+    sort_by: str = Query("id", pattern="^(id|amount|risk_score|step|created_at)$"),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
