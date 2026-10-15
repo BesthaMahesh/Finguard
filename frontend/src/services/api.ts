@@ -9,8 +9,80 @@ import {
   PolicyCitation,
 } from '../types';
 
-const RAW_API_URL = (import.meta.env.VITE_API_URL as string) || '';
-const API_BASE = RAW_API_URL ? `${RAW_API_URL.replace(/\/$/, '')}/api/v1` : '/api/v1';
+export const getApiBase = (): string => {
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem('finguard_backend_url');
+    if (custom && custom.trim()) {
+      return `${custom.trim().replace(/\/$/, '')}/api/v1`;
+    }
+  }
+  const envUrl = (import.meta.env.VITE_API_URL as string) || '';
+  if (envUrl && envUrl.trim()) {
+    return `${envUrl.trim().replace(/\/$/, '')}/api/v1`;
+  }
+  return '/api/v1';
+};
+
+export const getBackendHost = (): string => {
+  if (typeof window !== 'undefined') {
+    const custom = localStorage.getItem('finguard_backend_url');
+    if (custom && custom.trim()) {
+      return custom.trim().replace(/\/$/, '');
+    }
+  }
+  const envUrl = (import.meta.env.VITE_API_URL as string) || '';
+  if (envUrl && envUrl.trim()) {
+    return envUrl.trim().replace(/\/$/, '');
+  }
+  return typeof window !== 'undefined' ? window.location.origin : '';
+};
+
+export const setCustomBackendUrl = (url: string) => {
+  if (typeof window !== 'undefined') {
+    if (url && url.trim()) {
+      localStorage.setItem('finguard_backend_url', url.trim().replace(/\/$/, ''));
+    } else {
+      localStorage.removeItem('finguard_backend_url');
+    }
+  }
+};
+
+const API_BASE = '/api/v1';
+
+export async function apiFetch(path: string, options: RequestInit = {}, timeoutMs = 50000): Promise<Response> {
+  const base = getApiBase();
+  let fullUrl = path;
+  if (fullUrl.startsWith('/api/v1/')) {
+    fullUrl = `${base}${fullUrl.replace('/api/v1', '')}`;
+  } else if (!fullUrl.startsWith('http')) {
+    fullUrl = `${base}${fullUrl.startsWith('/') ? fullUrl : `/${fullUrl}`}`;
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(fullUrl, {
+      ...options,
+      signal: controller.signal,
+    });
+    return res;
+  } catch (err: any) {
+    if (err.name === 'AbortError') {
+      throw new Error(
+        'Request timed out (50s). If the Render free backend was sleeping, it takes ~50s to wake up. Please click Sign In again.'
+      );
+    }
+    if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError'))) {
+      throw new Error(
+        `Unable to reach backend (${base}). Please ensure Render is awake and CORS is active, or configure your Backend URL below.`
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 let currentToken: string | null = localStorage.getItem('finguard_token');
 
@@ -56,13 +128,23 @@ async function handleResponse<T>(res: Response): Promise<T> {
     }
     throw new Error(msg || `HTTP Error ${res.status}`);
   }
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    const text = await res.text();
+    if (text.includes('<!DOCTYPE') || text.includes('<html')) {
+      throw new Error(
+        'Received HTML instead of JSON. The frontend is requesting itself instead of the backend. Please set your Render Backend URL in the login screen.'
+      );
+    }
+  }
+
   return res.json();
 }
 
 export const api = {
   // Auth
   async login(username: string, password: string): Promise<{ access_token: string; user: UserProfile }> {
-    const res = await fetch(`${API_BASE}/auth/token`, {
+    const res = await apiFetch(`${API_BASE}/auth/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
@@ -84,7 +166,7 @@ export const api = {
 
   async logout(): Promise<void> {
     try {
-      await fetch(`${API_BASE}/auth/logout`, {
+      await apiFetch(`${API_BASE}/auth/logout`, {
         method: 'POST',
         headers: getHeaders(),
       });
@@ -94,13 +176,13 @@ export const api = {
   },
 
   async getCurrentUser(): Promise<UserProfile> {
-    const res = await fetch(`${API_BASE}/auth/me`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/auth/me`, { headers: getHeaders() });
     return handleResponse<UserProfile>(res);
   },
 
   // Dashboard
   async getDashboardSummary(): Promise<DashboardSummary> {
-    const res = await fetch(`${API_BASE}/dashboard/summary`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/dashboard/summary`, { headers: getHeaders() });
     return handleResponse<DashboardSummary>(res);
   },
 
@@ -123,18 +205,18 @@ export const api = {
     if (params.sort_by) query.set('sort_by', params.sort_by);
     if (params.sort_order) query.set('sort_order', params.sort_order);
 
-    const res = await fetch(`${API_BASE}/transactions?${query.toString()}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/transactions?${query.toString()}`, { headers: getHeaders() });
     return handleResponse(res);
   },
 
   async getTransactionDetail(id: number): Promise<Transaction & { rule_flags: any[]; feature_contributions: any[] }> {
-    const res = await fetch(`${API_BASE}/transactions/${id}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/transactions/${id}`, { headers: getHeaders() });
     return handleResponse(res);
   },
 
   // Risk
   async analyzeRisk(txData: any, useMultiAgent = true): Promise<any> {
-    const res = await fetch(`${API_BASE}/risk/analyze`, {
+    const res = await apiFetch(`${API_BASE}/risk/analyze`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ ...txData, use_multi_agent: useMultiAgent }),
@@ -147,17 +229,17 @@ export const api = {
     const query = new URLSearchParams();
     if (params?.status) query.set('status', params.status);
     if (params?.priority) query.set('priority', params.priority);
-    const res = await fetch(`${API_BASE}/investigations?${query.toString()}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/investigations?${query.toString()}`, { headers: getHeaders() });
     return handleResponse(res);
   },
 
   async getInvestigationDetail(id: string): Promise<InvestigationCase> {
-    const res = await fetch(`${API_BASE}/investigations/${id}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/investigations/${id}`, { headers: getHeaders() });
     return handleResponse(res);
   },
 
   async submitReview(caseId: string, disposition: string, notes: string): Promise<InvestigationCase> {
-    const res = await fetch(`${API_BASE}/investigations/${caseId}/review`, {
+    const res = await apiFetch(`${API_BASE}/investigations/${caseId}/review`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ disposition, disposition_notes: notes }),
@@ -167,18 +249,18 @@ export const api = {
 
   // Models
   async getModelRegistry(): Promise<any> {
-    const res = await fetch(`${API_BASE}/models`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/models`, { headers: getHeaders() });
     return handleResponse(res);
   },
 
   async getModelEvaluation(): Promise<ModelEvaluation> {
-    const res = await fetch(`${API_BASE}/models/evaluation`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/models/evaluation`, { headers: getHeaders() });
     return handleResponse<ModelEvaluation>(res);
   },
 
   // Knowledge / RAG
   async getKnowledgeStatus(): Promise<any> {
-    const res = await fetch(`${API_BASE}/knowledge/status`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/knowledge/status`, { headers: getHeaders() });
     return handleResponse(res);
   },
 
@@ -188,17 +270,17 @@ export const api = {
     if (params.file_type && params.file_type !== 'all') query.set('file_type', params.file_type);
     if (params.search) query.set('search', params.search);
 
-    const res = await fetch(`${API_BASE}/knowledge/documents?${query.toString()}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/knowledge/documents?${query.toString()}`, { headers: getHeaders() });
     return handleResponse(res);
   },
 
   async getKnowledgeDocumentDetail(documentId: string): Promise<any> {
-    const res = await fetch(`${API_BASE}/knowledge/documents/${documentId}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/knowledge/documents/${documentId}`, { headers: getHeaders() });
     return handleResponse(res);
   },
 
   async searchKnowledge(query: string, top_k = 4, category?: string, min_relevance_score = 0.40): Promise<any> {
-    const res = await fetch(`${API_BASE}/knowledge/search`, {
+    const res = await apiFetch(`${API_BASE}/knowledge/search`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ query, top_k, category, min_relevance_score }),
@@ -207,7 +289,7 @@ export const api = {
   },
 
   async searchPolicies(query: string, top_k = 3): Promise<{ query: string; citations: PolicyCitation[] }> {
-    const res = await fetch(`${API_BASE}/knowledge/search`, {
+    const res = await apiFetch(`${API_BASE}/knowledge/search`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ query, top_k }),
@@ -216,7 +298,7 @@ export const api = {
   },
 
   async triggerKnowledgeIngest(forceReindex = false): Promise<any> {
-    const res = await fetch(`${API_BASE}/knowledge/ingest`, {
+    const res = await apiFetch(`${API_BASE}/knowledge/ingest`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ force_reindex: forceReindex }),
@@ -225,7 +307,7 @@ export const api = {
   },
 
   async triggerDocumentReindex(docId?: string, reindexAll = false): Promise<any> {
-    const res = await fetch(`${API_BASE}/knowledge/reindex`, {
+    const res = await apiFetch(`${API_BASE}/knowledge/reindex`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ doc_id: docId, reindex_all: reindexAll }),
@@ -234,7 +316,7 @@ export const api = {
   },
 
   async deleteKnowledgeDocument(docId: string): Promise<any> {
-    const res = await fetch(`${API_BASE}/knowledge/documents/${docId}`, {
+    const res = await apiFetch(`${API_BASE}/knowledge/documents/${docId}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -251,7 +333,7 @@ export const api = {
       headers['Authorization'] = `Bearer ${currentToken}`;
     }
 
-    const res = await fetch(`${API_BASE}/knowledge/upload`, {
+    const res = await apiFetch(`${API_BASE}/knowledge/upload`, {
       method: 'POST',
       headers,
       body: formData,
@@ -261,24 +343,24 @@ export const api = {
 
   // Audit
   async getAuditEvents(limit = 50): Promise<{ items: AuditEvent[]; total: number }> {
-    const res = await fetch(`${API_BASE}/audit?limit=${limit}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/audit?limit=${limit}`, { headers: getHeaders() });
     return handleResponse(res);
   },
 
   // Observability
   async getObservabilitySummary(): Promise<ObservabilitySummary> {
-    const res = await fetch(`${API_BASE}/observability/summary`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/observability/summary`, { headers: getHeaders() });
     return handleResponse<ObservabilitySummary>(res);
   },
 
   // AI Risk Assistant
   async getAssistantConversations(): Promise<{ conversations: Array<{ id: string; title: string; message_count: number; created_at: string; updated_at: string }> }> {
-    const res = await fetch(`${API_BASE}/assistant/conversations`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/assistant/conversations`, { headers: getHeaders() });
     return handleResponse(res);
   },
 
   async createAssistantConversation(title?: string): Promise<{ id: string; title: string; created_at: string }> {
-    const res = await fetch(`${API_BASE}/assistant/conversations`, {
+    const res = await apiFetch(`${API_BASE}/assistant/conversations`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ title }),
@@ -287,12 +369,12 @@ export const api = {
   },
 
   async getAssistantConversationDetail(id: string): Promise<{ id: string; title: string; messages: any[] }> {
-    const res = await fetch(`${API_BASE}/assistant/conversations/${id}`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/assistant/conversations/${id}`, { headers: getHeaders() });
     return handleResponse(res);
   },
 
   async deleteAssistantConversation(id: string): Promise<any> {
-    const res = await fetch(`${API_BASE}/assistant/conversations/${id}`, {
+    const res = await apiFetch(`${API_BASE}/assistant/conversations/${id}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -303,7 +385,7 @@ export const api = {
     message: string,
     conversationId?: string
   ): Promise<{ reply: string; citations: PolicyCitation[]; conversation_id: string; llm_provider: string; model: string; latency_ms?: number }> {
-    const res = await fetch(`${API_BASE}/assistant/chat`, {
+    const res = await apiFetch(`${API_BASE}/assistant/chat`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ message, conversation_id: conversationId }),
@@ -313,12 +395,12 @@ export const api = {
 
   // MCP Tools
   async getMCPTools(): Promise<{ server: string; protocol: string; tools: any[] }> {
-    const res = await fetch(`${API_BASE}/mcp/tools`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/mcp/tools`, { headers: getHeaders() });
     return handleResponse(res);
   },
 
   async callMCPTool(name: string, args: Record<string, any>): Promise<any> {
-    const res = await fetch(`${API_BASE}/mcp/tools/call`, {
+    const res = await apiFetch(`${API_BASE}/mcp/tools/call`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ name, arguments: args }),
@@ -328,12 +410,12 @@ export const api = {
 
   // User Management (Admin Only)
   async getUsers(): Promise<any[]> {
-    const res = await fetch(`${API_BASE}/auth/users`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/auth/users`, { headers: getHeaders() });
     return handleResponse(res);
   },
 
   async updateUserStatus(userId: string, isActive: boolean): Promise<any> {
-    const res = await fetch(`${API_BASE}/auth/users/${userId}/status`, {
+    const res = await apiFetch(`${API_BASE}/auth/users/${userId}/status`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify({ is_active: isActive }),
@@ -342,7 +424,7 @@ export const api = {
   },
 
   async resetUserPassword(userId: string, newPassword: string): Promise<any> {
-    const res = await fetch(`${API_BASE}/auth/users/${userId}/reset-password`, {
+    const res = await apiFetch(`${API_BASE}/auth/users/${userId}/reset-password`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ new_password: newPassword }),
@@ -352,12 +434,12 @@ export const api = {
 
   // Health and System Diagnostics
   async getHealth(): Promise<{ status: string; service: string; environment: string; architecture_layers: number; version: string; telemetry: string }> {
-    const res = await fetch(`${API_BASE}/health`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/health`, { headers: getHeaders() });
     return handleResponse(res);
   },
 
   async getReadiness(): Promise<{ status: string; database: string; model_engine: string; knowledge_rag: string }> {
-    const res = await fetch(`${API_BASE}/ready`, { headers: getHeaders() });
+    const res = await apiFetch(`${API_BASE}/ready`, { headers: getHeaders() });
     return handleResponse(res);
   },
 };
