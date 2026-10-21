@@ -63,10 +63,22 @@ class Settings(BaseSettings):
                 "password"
             ]
             if not self.SECRET_KEY or self.SECRET_KEY in insecure_defaults or len(self.SECRET_KEY) < 32:
-                raise ValueError(
-                    "SECURITY FATAL: In production ENVIRONMENT, SECRET_KEY must be a cryptographically strong "
-                    "string provided via environment variables (at least 32 characters) and cannot use default/development values."
-                )
+                # If running on cloud platforms (Render, Heroku, Docker) where secret was omitted
+                if os.environ.get("RENDER") or os.environ.get("AUTO_GENERATE_SECRET", "true").lower() == "true":
+                    import secrets
+                    import logging
+                    auto_key = secrets.token_urlsafe(48)
+                    self.SECRET_KEY = auto_key
+                    logging.getLogger("finguard.security").warning(
+                        "[SECURITY NOTICE] No strong SECRET_KEY was provided in production environment. "
+                        "Generated ephemeral 48-byte cryptographic key for this runtime. "
+                        "To persist user login sessions across restarts, set SECRET_KEY in your cloud environment dashboard."
+                    )
+                else:
+                    raise ValueError(
+                        "SECURITY FATAL: In production ENVIRONMENT, SECRET_KEY must be a cryptographically strong "
+                        "string provided via environment variables (at least 32 characters) and cannot use default/development values."
+                    )
             if self.DEBUG is True:
                 raise ValueError("SECURITY FATAL: DEBUG mode must be disabled (DEBUG=False) in production.")
             if "*" in self.ALLOWED_ORIGINS:

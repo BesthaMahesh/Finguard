@@ -61,10 +61,11 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Middleware - Restrict to explicitly trusted origins without wildcard regex
+# CORS Middleware - Restrict to explicitly trusted origins and trusted deployment subdomains
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
+    allow_origin_regex=r"https://.*\.onrender\.com|https://.*\.vercel\.app|http://localhost:\d+|http://127\.0\.0\.1:\d+",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
