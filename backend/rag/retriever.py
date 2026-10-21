@@ -250,13 +250,14 @@ class PolicyRetriever:
         if not os.path.exists(kb_dir):
             kb_dir = "./knowledge_base"
 
-        q_clean = query.lower()
+        q_norm = query.lower().replace("-", " ").replace("_", " ").replace("/", " ")
         stops = {
             "what", "are", "the", "for", "under", "indexed", "in", "and", "is", "a",
             "an", "to", "of", "how", "does", "it", "when", "apply", "which", "with",
-            "from", "this", "that", "there", "then", "into", "over", "can", "should"
+            "from", "this", "that", "there", "then", "into", "over", "can", "should",
+            "by", "not", "do", "all", "any"
         }
-        raw_words = [w.strip("?,.:;\"'()[]") for w in q_clean.split()]
+        raw_words = [w.strip("?,.:;\"'()[]") for w in q_norm.split()]
         keywords = [w for w in raw_words if w not in stops and len(w) > 2]
         if not keywords:
             return []
@@ -271,10 +272,12 @@ class PolicyRetriever:
 
             fname = os.path.basename(fpath)
             doc_id = "POL-GOV"
-            for line in content.splitlines()[:10]:
+            version_val = "1.0"
+            for line in content.splitlines()[:12]:
                 if "Document ID:" in line or "document_id:" in line.lower():
                     doc_id = line.split(":", 1)[1].strip()
-                    break
+                if "Version:" in line or "version:" in line.lower():
+                    version_val = line.split(":", 1)[1].strip().strip('"\'')
 
             sections = content.split("\n## ")
             for sec in sections[1:]:
@@ -290,28 +293,45 @@ class PolicyRetriever:
                 for kw in keywords:
                     if kw in title_lower:
                         matched_keywords.add(kw)
-                        score += 5
+                        score += 6
                     elif kw in sec_lower:
                         matched_keywords.add(kw)
                         score += 2
 
-                # Topic-specific exact phrases
-                if any(x in q_clean for x in ["four-eyes", "four eyes", "4-eyes"]):
-                    if any(x in sec_lower or x in title_lower for x in ["four-eyes", "4-eyes"]):
-                        score += 15
-                        matched_keywords.add("four-eyes")
-                if any(x in q_clean for x in ["account takeover", "ato"]):
+                # Topic-specific exact phrases and semantic boosters
+                if any(x in q_norm for x in ["four eyes", "4 eyes", "four eyes principle"]):
+                    if any(x in sec_lower or x in title_lower for x in ["four eyes", "4 eyes"]):
+                        score += 20
+                        matched_keywords.add("four_eyes")
+
+                if any(x in q_norm for x in ["account takeover", "ato"]):
                     if any(x in sec_lower or x in title_lower for x in ["account takeover", "ato"]):
-                        score += 15
+                        score += 20
                         matched_keywords.add("ato")
-                if "human" in q_clean and "review" in q_clean:
-                    if any(x in sec_lower or x in title_lower for x in ["human review", "investigator review", "mandatory human review"]):
-                        score += 15
+
+                if ("human" in q_norm and "review" in q_norm) or "investigator review" in q_norm:
+                    if any(x in sec_lower or x in title_lower for x in ["human review", "investigator review", "mandatory human review", "investigator authorization"]):
+                        score += 20
                         matched_keywords.add("human_review")
+
+                if any(x in q_norm for x in ["distinguish", "model generated", "verified fraud", "decision support", "non autonomous"]):
+                    if any(x in sec_lower or x in title_lower for x in ["decision support", "model scores vs", "verified fraud", "statistical probability indicator", "non autonomous"]):
+                        score += 25
+                        matched_keywords.add("decision_support")
+
+                if any(x in q_norm for x in ["not supported", "unsupported", "insufficient evidence", "question is not supported"]):
+                    if any(x in sec_lower or x in title_lower for x in ["unsupported inquiries", "insufficient policy evidence", "strict abstention", "withhold automated synthesis"]):
+                        score += 25
+                        matched_keywords.add("abstention_policy")
+
+                if any(x in q_norm for x in ["synthetic identity", "shell entity"]):
+                    if any(x in sec_lower or x in title_lower for x in ["synthetic identity", "shell entity"]):
+                        score += 20
+                        matched_keywords.add("synthetic_identity")
 
                 # Require at least 2 distinct keywords OR an exact topic bonus to prevent false positives
                 if len(matched_keywords) >= 2 or score >= 15:
-                    calc_relevance = min(0.95, round(0.40 + (score * 0.03), 3))
+                    calc_relevance = min(0.95, round(0.45 + (score * 0.02), 3))
                     if calc_relevance >= min_relevance_score:
                         results.append({
                             "document_id": doc_id,
@@ -322,7 +342,7 @@ class PolicyRetriever:
                             "source_file": fname,
                             "page_number": None,
                             "section": sec_title,
-                            "version": "1.0",
+                            "version": version_val,
                             "status": "ACTIVE",
                             "effective_from": None,
                             "effective_to": None,

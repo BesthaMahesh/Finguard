@@ -309,12 +309,13 @@ def chat_with_risk_assistant(
             doc = top_c.get("document_id", "POLICY")
             ver = top_c.get("version", "1.0")
             src = top_c.get("source_file", "Official Manual")
-            excerpt = top_c.get("excerpt", "").strip()
+            full_text = top_c.get("full_text", top_c.get("excerpt", "")).strip()
 
             lines = [
                 f"### Grounded Compliance Guidance: {sec}\n",
-                f"**Governing Policy:** `{doc}` (v{ver}, {src})\n",
-                f"{excerpt}\n"
+                f"**Governing Policy:** `{doc}` (Version {ver}, `{src}`)\n",
+                f"{full_text}\n\n",
+                f"> **Operational Principle:** Model-generated risk scores serve strictly as non-autonomous decision support alerts. Final disposition requires review and sign-off by an authorized human investigator."
             ]
             reply_text = "\n".join(lines)
         else:
