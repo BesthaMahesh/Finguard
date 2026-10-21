@@ -1,14 +1,23 @@
 import os
 import sys
-import uvicorn
-import secrets
 
-# Enable immediate output flushing for cloud logging services like Render
+# Force immediate unbuffered standard output for cloud logs (Render / Docker)
 os.environ["PYTHONUNBUFFERED"] = "1"
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(line_buffering=True)
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(line_buffering=True)
+os.environ["USE_LIGHTWEIGHT_EMBEDDINGS"] = "true"
+os.environ["USE_LIGHTWEIGHT_PII"] = "true"
+
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(line_buffering=True)
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(line_buffering=True)
+except Exception:
+    pass
+
+print("[FinGuard] Runner starting up...", flush=True)
+
+import secrets
+import uvicorn
 
 if __name__ == "__main__":
     # Ensure strong cryptographic SECRET_KEY in production cloud environments (e.g. Render)
@@ -23,14 +32,15 @@ if __name__ == "__main__":
         os.environ["SECRET_KEY"] = ephemeral_secret
         print("[FinGuard] Notice: Auto-generated ephemeral 48-byte SECRET_KEY for cloud runtime.", flush=True)
 
-    port_str = os.environ.get("PORT", "8000")
+    port_str = os.environ.get("PORT", "10000")
     try:
         port = int(port_str)
     except ValueError:
-        print(f"[FinGuard] Warning: Invalid PORT '{port_str}', defaulting to 8000", flush=True)
-        port = 8000
+        print(f"[FinGuard] Warning: Invalid PORT '{port_str}', defaulting to 10000", flush=True)
+        port = 10000
 
     host = os.environ.get("HOST", "0.0.0.0")
-    print(f"[FinGuard] Starting Uvicorn on {host}:{port}...", flush=True)
+    print(f"[FinGuard] Binding and starting Uvicorn on {host}:{port}...", flush=True)
     uvicorn.run("backend.main:app", host=host, port=port, log_level="info")
+
 
