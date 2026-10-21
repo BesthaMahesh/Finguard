@@ -209,7 +209,10 @@ class FinGuardMCPTools:
     @classmethod
     def update_case_disposition(cls, args: dict, user_role: str = "investigator", username: str = "system_agent") -> dict:
         """Updates case disposition with mandatory 4-Eyes governance verification."""
-        if user_role not in ("investigator", "administrator"):
+        from backend.security.rbac import normalize_role, UserRole
+        from datetime import timezone
+        role_norm = normalize_role(user_role)
+        if role_norm not in (UserRole.INVESTIGATOR, UserRole.ADMIN, UserRole.ADMINISTRATOR):
             return {"error": "Unauthorized: Case disposition requires 'investigator' or 'administrator' role.", "status": "FORBIDDEN"}
 
         try:
@@ -226,7 +229,7 @@ class FinGuardMCPTools:
             case.disposition = validated.disposition
             case.disposition_notes = validated.disposition_notes
             case.reviewed_by = username
-            case.reviewed_at = datetime.utcnow()
+            case.reviewed_at = datetime.now(timezone.utc)
             case.status = "CLOSED_RESOLVED" if validated.disposition != "DISMISS_FALSE_POSITIVE" else "CLOSED_FALSE_POSITIVE"
 
             # Update linked transaction status

@@ -1,11 +1,15 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey, Index
 from sqlalchemy.orm import relationship
 from backend.db.session import Base
 import uuid
+import hashlib
 
 def generate_uuid() -> str:
     return str(uuid.uuid4())
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 class User(Base):
     __tablename__ = "users"
@@ -17,7 +21,7 @@ class User(Base):
     full_name = Column(String(100), nullable=False)
     role = Column(String(30), default="analyst", nullable=False)  # analyst, investigator, auditor, administrator
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
 class Transaction(Base):
     __tablename__ = "transactions"
@@ -42,7 +46,7 @@ class Transaction(Base):
     risk_level = Column(String(20), default="LOW")  # LOW, MEDIUM, HIGH, CRITICAL
     status = Column(String(30), default="UNREVIEWED")  # UNREVIEWED, UNDER_INVESTIGATION, CLEARED, ESCALATED, CONFIRMED_FRAUD
     rule_flags = Column(Text, nullable=True)  # JSON list of triggered rule IDs
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
 
     investigation_cases = relationship("InvestigationCase", back_populates="transaction")
 
@@ -70,8 +74,8 @@ class InvestigationCase(Base):
     disposition_notes = Column(Text, nullable=True)
     reviewed_by = Column(String(50), nullable=True)
     reviewed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
 
     transaction = relationship("Transaction", back_populates="investigation_cases")
 
@@ -88,7 +92,10 @@ class AuditEvent(Base):
     outcome = Column(String(20), default="SUCCESS")  # SUCCESS, FAILURE, DENIED
     details_json = Column(Text, nullable=True)
     ip_address = Column(String(50), nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, index=True)
+    policy_version_applied = Column(String(30), nullable=True)
+    event_hash = Column(String(64), nullable=True)
+    previous_hash = Column(String(64), nullable=True)
+    timestamp = Column(DateTime, default=utc_now, index=True)
 
 class KnowledgeDocument(Base):
     __tablename__ = "knowledge_documents"
@@ -98,10 +105,19 @@ class KnowledgeDocument(Base):
     title = Column(String(200), nullable=False)
     category = Column(String(50), nullable=False)  # AML, KYC, FRAUD_TYPOLOGY, SANCTIONS, INTERNAL_POLICY
     version = Column(String(20), default="1.0")
+    status = Column(String(30), default="ACTIVE")  # ACTIVE, SUPERSEDED, EXPIRED
+    effective_from = Column(String(20), nullable=True)
+    effective_to = Column(String(20), nullable=True)
+    jurisdiction = Column(String(30), default="GLOBAL")
+    approval_status = Column(String(30), default="APPROVED")
+    supersedes_version = Column(String(20), nullable=True)
+    content_hash = Column(String(64), nullable=True)
+    classification = Column(String(30), default="INTERNAL")
+    document_access_scope = Column(String(30), default="ALL")
     chunk_count = Column(Integer, default=1)
     content = Column(Text, nullable=False)
     metadata_json = Column(Text, nullable=True)
-    ingested_at = Column(DateTime, default=datetime.utcnow)
+    ingested_at = Column(DateTime, default=utc_now)
 
 class ModelMetadata(Base):
     __tablename__ = "model_metadata"

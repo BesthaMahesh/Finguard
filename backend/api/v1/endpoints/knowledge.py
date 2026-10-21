@@ -152,12 +152,15 @@ def search_knowledge(
 ):
     """
     Executes grounded semantic search across the knowledge base with citations and synthesis.
+    Supports temporal versioning (event_date), jurisdiction filtering, and access scoping.
     """
     check_permission(current_user["role"], "search_policies")
     query = payload.get("query", "").strip()
-    top_k = int(payload.get("top_k", 4))
+    top_k = min(max(int(payload.get("top_k", 4)), 1), 20)
     category = payload.get("category")
-    min_score = float(payload.get("min_relevance_score", 0.40))
+    min_score = max(min(float(payload.get("min_relevance_score", 0.40)), 1.0), 0.0)
+    event_date = payload.get("event_date")
+    jurisdiction = payload.get("jurisdiction")
 
     if not query or len(query) < 2:
         raise HTTPException(status_code=400, detail="Query must be at least 2 characters long.")
@@ -166,7 +169,10 @@ def search_knowledge(
         query=query,
         top_k=top_k,
         category=category,
-        min_relevance_score=min_score
+        min_relevance_score=min_score,
+        event_date=event_date,
+        jurisdiction=jurisdiction,
+        user_role=current_user["role"]
     )
 
     return response.model_dump()
@@ -251,7 +257,7 @@ async def upload_knowledge_document(
 ):
     """
     Uploads a supported document (.pdf, .md, .txt, .html, .csv, .docx)
-    Validates file extension, size limit, and prevents directory traversal.
+    Validates file extension, magic bytes, size limit, and prevents directory traversal.
     Saves document in knowledge_base/<category> and triggers incremental ingestion.
     """
     check_permission(current_user["role"], "ingest_data")
@@ -261,13 +267,16 @@ async def upload_knowledge_document(
     if target_category not in ALLOWED_UPLOAD_CATEGORIES:
         target_category = "regulations"
 
-    # 2. Validate Filename & Extension (Sanitize path traversal)
+    # 2. Validate Filename & Prevent Path Traversal / Poison Null Bytes
     raw_filename = os.path.basename(file.filename or "")
-    if not raw_filename:
-        raise HTTPException(status_code=400, detail="Missing or invalid filename.")
+    if not raw_filename or "\x00" in raw_filename:
+        raise HTTPException(status_code=400, detail="Missing or malicious filename.")
 
-    # Prevent directory traversal attacks
+    # Sanitize characters to strict safe set
     safe_filename = "".join(c for c in raw_filename if c.isalnum() or c in ("-", "_", ".")).strip()
+    if not safe_filename:
+        raise HTTPException(status_code=400, detail="Invalid filename after sanitization.")
+
     ext = os.path.splitext(safe_filename)[1].lower()
     if ext not in SUPPORTED_EXTENSIONS:
         raise HTTPException(
@@ -285,7 +294,12 @@ async def upload_knowledge_document(
     if len(content_bytes) == 0:
         raise HTTPException(status_code=400, detail="Uploaded file is empty (0 bytes).")
 
-    # 4. Save to target category directory in knowledge_base
+    # 4. Content Type & Magic Byte Validation
+    if ext == ".pdf":
+        if not content_bytes.startswith(b"%PDF"):
+            raise HTTPException(status_code=400, detail="Content mismatch: File extension is .pdf but content is not a valid PDF header.")
+
+    # 5. Save to target category directory in knowledge_base
     dest_dir = os.path.abspath(os.path.join("knowledge_base", target_category))
     os.makedirs(dest_dir, exist_ok=True)
     dest_path = os.path.join(dest_dir, safe_filename)
@@ -293,7 +307,7 @@ async def upload_knowledge_document(
     with open(dest_path, "wb") as f:
         f.write(content_bytes)
 
-    # 5. Automatically trigger incremental ingestion
+    # 6. Automatically trigger incremental ingestion
     pipeline = KnowledgeIngestionPipeline()
     stats = pipeline.run_incremental_ingestion()
 

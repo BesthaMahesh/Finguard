@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict, model_validator
 from typing import List
 import os
 
@@ -44,9 +45,32 @@ class Settings(BaseSettings):
     RANDOM_SEED: int = 42
     FRAUD_THRESHOLD: float = 0.65
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        extra = "ignore"
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
+
+    @model_validator(mode="after")
+    def validate_production_security(self):
+        env = (self.ENVIRONMENT or "").strip().lower()
+        if env == "production":
+            insecure_defaults = [
+                "finguard-enterprise-autonomous-risk-intelligence-secure-jwt-key",
+                "finguard-secret-key-for-development-change-in-production",
+                "secret",
+                "changeme",
+                "password"
+            ]
+            if not self.SECRET_KEY or self.SECRET_KEY in insecure_defaults or len(self.SECRET_KEY) < 32:
+                raise ValueError(
+                    "SECURITY FATAL: In production ENVIRONMENT, SECRET_KEY must be a cryptographically strong "
+                    "string provided via environment variables (at least 32 characters) and cannot use default/development values."
+                )
+            if self.DEBUG is True:
+                raise ValueError("SECURITY FATAL: DEBUG mode must be disabled (DEBUG=False) in production.")
+            if "*" in self.ALLOWED_ORIGINS:
+                raise ValueError("SECURITY FATAL: Wildcard CORS origin ('*') is prohibited in production when credentials are enabled.")
+        return self
 
 settings = Settings()

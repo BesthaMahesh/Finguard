@@ -1,7 +1,7 @@
 {
   "version": "1.0",
-  "last_updated": "2026-10-12T15:42:06.048120",
-  "total_documents": 9,
+  "last_updated": "2026-10-21T17:42:31.400325",
+  "total_documents": 10,
   "total_chunks": 1012,
   "documents": {
     "doc-anti-money-laundering-guide": {
@@ -174,6 +174,34 @@
       "status": "INDEXED",
       "error_message": null,
       "ingested_at": "2026-10-12T15:42:06.047813"
+    },
+    "DOC-CORRUPT-TEST": {
+      "doc_id": "DOC-CORRUPT-TEST",
+      "document_title": "corrupt_policy.pdf",
+      "category": "regulations",
+      "source_type": "official_regulation",
+      "file_type": "PDF",
+      "file_name": "corrupt_policy.pdf",
+      "file_path": "./non_existent_file.pdf",
+      "content_hash": "dummyhash12345",
+      "file_size_bytes": 100,
+      "page_count": 1,
+      "character_count": 0,
+      "chunk_count": 0,
+      "version": "1.0",
+      "status": "FAILED",
+      "effective_from": null,
+      "effective_to": null,
+      "uploaded_at": null,
+      "last_reviewed_at": null,
+      "supersedes_version": null,
+      "jurisdiction": "GLOBAL",
+      "approval_status": "APPROVED",
+      "classification": "INTERNAL",
+      "document_access_scope": "ALL",
+      "author": null,
+      "error_message": "PDF file not found: ./non_existent_file.pdf",
+      "ingested_at": "2026-10-21T17:42:31.400121"
     }
   }
 }

@@ -122,3 +122,26 @@ The application provisions two initial development accounts, configurable via en
 - **F1 Score**: **0.9412**
 - **Decision Threshold**: **0.65**
 - **Target Leakage**: Guaranteed 0% leakage via `LeakageGuard`
+
+---
+
+## 🛡️ Enterprise Security, Privacy & ISO/IEC 27001:2022 Alignment
+
+FinGuard features an enterprise-grade AI security architecture designed for regulated financial institutions:
+
+* **Microsoft Presidio PII Protection**: Real-time analysis and anonymization of customer names, email addresses, phone numbers, and financial account identifiers (`C123***815`) across LLM requests, RAG evidence, and logs. Reversible tokenization vault for authorized investigators.
+* **PromptGuard & Untrusted Context Sandboxing**: Defense-in-depth protection against direct and indirect prompt injection, jailbreak attempts, and delimiter hijacking.
+* **Model Context Protocol (MCP) Governance**: Explicit approved tool allowlist, read-only vs. side-effect segregation, server-side RBAC, and mandatory 4-Eyes human review for severe actions (`FREEZE_ACCOUNT`, `ESCALATE_TO_SAR`).
+* **Policy Versioning & Temporal Freshness**: Event-date policy retrieval (`effective_from` / `effective_to`), jurisdiction pre-filtering, and safe atomic reindexing with automatic rollback.
+* **Tamper-Evident Auditability**: Cryptographic SHA-256 hash chaining on all `AuditEvent` logs with genesis root verification.
+* **Fail-Fast Production Configuration**: Fails startup in production if `DEBUG=True`, if `SECRET_KEY` is under 32 characters or default, or if CORS wildcards are enabled.
+
+### Security Documentation Directory
+- [Baseline Security Audit](file:///c:/Users/mahes/Documents/FinGuard-Autonomous-Financial-Risk-Intelligence/docs/security/BASELINE_SECURITY_AUDIT.md)
+- [ISO/IEC 27001:2022 Control Register](file:///c:/Users/mahes/Documents/FinGuard-Autonomous-Financial-Risk-Intelligence/docs/security/ISO_27001_CONTROL_REGISTER.md)
+- [ISO/IEC 27001:2022 Implementation Gaps](file:///c:/Users/mahes/Documents/FinGuard-Autonomous-Financial-Risk-Intelligence/docs/security/ISO_27001_IMPLEMENTATION_GAPS.md)
+- [STRIDE Threat Model & OWASP Top 10 for LLM](file:///c:/Users/mahes/Documents/FinGuard-Autonomous-Financial-Risk-Intelligence/docs/security/THREAT_MODEL.md)
+- [PII Handling & Presidio Architecture](file:///c:/Users/mahes/Documents/FinGuard-Autonomous-Financial-Risk-Intelligence/docs/security/PII_HANDLING.md)
+- [Policy Versioning & Context Freshness Guide](file:///c:/Users/mahes/Documents/FinGuard-Autonomous-Financial-Risk-Intelligence/docs/security/POLICY_VERSIONING_AND_FRESHNESS.md)
+- [Security Test Plan](file:///c:/Users/mahes/Documents/FinGuard-Autonomous-Financial-Risk-Intelligence/docs/security/SECURITY_TEST_PLAN.md)
+- [Implementation Report](file:///c:/Users/mahes/Documents/FinGuard-Autonomous-Financial-Risk-Intelligence/docs/security/IMPLEMENTATION_REPORT.md)
