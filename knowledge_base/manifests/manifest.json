@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "last_updated": "2026-10-21T17:42:31.400325",
+  "last_updated": "2026-10-21T18:49:36.740832",
   "total_documents": 10,
   "total_chunks": 1012,
   "documents": {
@@ -201,7 +201,7 @@
       "document_access_scope": "ALL",
       "author": null,
       "error_message": "PDF file not found: ./non_existent_file.pdf",
-      "ingested_at": "2026-10-21T17:42:31.400121"
+      "ingested_at": "2026-10-21T18:49:36.740620"
     }
   }
 }

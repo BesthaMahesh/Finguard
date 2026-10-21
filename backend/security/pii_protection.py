@@ -1,75 +1,79 @@
-"""
-FinGuard Enterprise PII Protection & Data Anonymization Engine
-Powered by Microsoft Presidio (AnalyzerEngine & AnonymizerEngine)
-With Custom Financial Recognizers, Tokenization Vault, and Fail-Safe Masking.
-"""
-
+import os
 import logging
 import re
 from typing import Dict, Any, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-# Try loading Presidio Analyzer and Anonymizer
-_PRESIDIO_AVAILABLE = False
-try:
-    from presidio_analyzer import AnalyzerEngine, PatternRecognizer, Pattern
-    from presidio_anonymizer import AnonymizerEngine
-    from presidio_anonymizer.entities import OperatorConfig
-    _PRESIDIO_AVAILABLE = True
-except ImportError:
-    _PRESIDIO_AVAILABLE = False
-    logger.warning("Microsoft Presidio not available; fallback regex masking will be active.")
-
-
 class FinancialPIIProtector:
     """
     Enterprise PII Detection & Anonymization Engine.
     Protects user inputs, RAG retrieved context, telemetry logs, and LLM payloads.
+    Uses lazy initialization to keep startup memory well below 200MB on cloud instances (Render).
     """
 
     def __init__(self):
-        self.presidio_available = _PRESIDIO_AVAILABLE
         self.analyzer: Optional[Any] = None
         self.anonymizer: Optional[Any] = None
         self._vault: Dict[str, str] = {}  # Access-controlled token vault for reversible lookup
+        self._presidio_attempted: bool = False
 
-        if self.presidio_available:
+    @property
+    def presidio_available(self) -> bool:
+        self._ensure_presidio()
+        return self.analyzer is not None
+
+    def _ensure_presidio(self):
+        """Lazy-loads Presidio engines on demand, respecting cloud memory limits."""
+        if self._presidio_attempted:
+            return
+        self._presidio_attempted = True
+
+        # In cloud runtimes with strict RAM limits (e.g. Render 512MB free tier),
+        # keep memory footprint low by utilizing the built-in regex protection
+        if os.environ.get("RENDER") or os.environ.get("USE_LIGHTWEIGHT_PII", "false").lower() in ("true", "1", "yes"):
+            logger.info("Cloud runtime active; running lightweight high-speed PII protection.")
+            return
+
+        try:
+            from presidio_analyzer import AnalyzerEngine
+            from presidio_anonymizer import AnonymizerEngine
+
+            # Safely probe for lightweight spaCy model
+            chosen_model = None
             try:
-                # Safely probe for locally installed spaCy models without remote download attempts
+                import spacy
+                installed = spacy.util.get_installed_models()
+                for m in ["en_core_web_sm", "en_core_web_md"]:
+                    if m in installed:
+                        chosen_model = m
+                        break
+            except Exception:
                 chosen_model = None
-                try:
-                    import spacy
-                    installed = spacy.util.get_installed_models()
-                    for m in ["en_core_web_sm", "en_core_web_lg", "en_core_web_md"]:
-                        if m in installed:
-                            chosen_model = m
-                            break
-                except Exception:
-                    chosen_model = None
 
-                if chosen_model:
-                    from presidio_analyzer.nlp_engine import NlpEngineProvider
-                    nlp_conf = {"nlp_engine_name": "spacy", "models": [{"lang_code": "en", "model_name": chosen_model}]}
-                    provider = NlpEngineProvider(nlp_configuration=nlp_conf)
-                    self.analyzer = AnalyzerEngine(nlp_engine=provider.create_engine())
-                else:
-                    try:
-                        self.analyzer = AnalyzerEngine()
-                    except Exception as err:
-                        logger.warning(f"Presidio AnalyzerEngine skipped ({err}). Fast regex masking active.")
-                        self.analyzer = None
+            if chosen_model:
+                from presidio_analyzer.nlp_engine import NlpEngineProvider
+                nlp_conf = {"nlp_engine_name": "spacy", "models": [{"lang_code": "en", "model_name": chosen_model}]}
+                provider = NlpEngineProvider(nlp_configuration=nlp_conf)
+                self.analyzer = AnalyzerEngine(nlp_engine=provider.create_engine())
+            else:
+                self.analyzer = AnalyzerEngine()
 
-                self.anonymizer = AnonymizerEngine()
-                if self.analyzer:
-                    self._register_custom_financial_recognizers()
-            except Exception as e:
-                logger.warning(f"Presidio model setup skipped: {e}. Active with regex pattern protection.")
-                self.analyzer = None
+            self.anonymizer = AnonymizerEngine()
+            self._register_custom_financial_recognizers()
+        except Exception as e:
+            logger.warning(f"Presidio engine initialization skipped: {e}. Active with regex pattern protection.")
+            self.analyzer = None
+            self.anonymizer = None
 
     def _register_custom_financial_recognizers(self):
         """Register custom recognizers for banking & financial crime domain."""
         if not self.analyzer:
+            return
+
+        try:
+            from presidio_analyzer import PatternRecognizer, Pattern
+        except ImportError:
             return
 
         # 1. PaySim & Core Banking Account IDs (e.g. C1234567890, M9876543210)
@@ -141,8 +145,9 @@ class FinancialPIIProtector:
         if not text or not isinstance(text, str):
             return []
 
+        self._ensure_presidio()
         results = []
-        if self.presidio_available and self.analyzer:
+        if self.analyzer:
             try:
                 analyzer_results = self.analyzer.analyze(
                     text=text,
@@ -182,7 +187,8 @@ class FinancialPIIProtector:
         if not text or not isinstance(text, str):
             return text or ""
 
-        if self.presidio_available and self.analyzer and self.anonymizer:
+        self._ensure_presidio()
+        if self.analyzer and self.anonymizer:
             try:
                 analyzer_results = self.analyzer.analyze(
                     text=text,

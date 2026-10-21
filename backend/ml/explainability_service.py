@@ -4,7 +4,6 @@ import joblib
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, List
-import shap
 from backend.ml.features import extract_features_single, FEATURE_COLUMNS
 
 logger = logging.getLogger(__name__)
@@ -41,11 +40,13 @@ class ExplainabilityService:
         if self._background is None and os.path.exists(self.background_path):
             self._background = joblib.load(self.background_path)
             try:
+                import shap
                 # TreeExplainer for RandomForest
                 self._explainer = shap.TreeExplainer(self._model, data=self._background)
             except Exception as e:
                 logger.warning(f"Could not initialize TreeExplainer with background data: {e}. Fallback to model-only TreeExplainer.")
                 try:
+                    import shap
                     self._explainer = shap.TreeExplainer(self._model)
                 except Exception as ex:
                     logger.error(f"Fallback TreeExplainer also failed: {ex}")
