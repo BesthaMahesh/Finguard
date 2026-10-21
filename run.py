@@ -3,6 +3,13 @@ import sys
 import uvicorn
 import secrets
 
+# Enable immediate output flushing for cloud logging services like Render
+os.environ["PYTHONUNBUFFERED"] = "1"
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(line_buffering=True)
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(line_buffering=True)
+
 if __name__ == "__main__":
     # Ensure strong cryptographic SECRET_KEY in production cloud environments (e.g. Render)
     current_secret = os.environ.get("SECRET_KEY", "")
@@ -14,7 +21,7 @@ if __name__ == "__main__":
     if not current_secret or current_secret in insecure_keys or len(current_secret) < 32:
         ephemeral_secret = secrets.token_urlsafe(48)
         os.environ["SECRET_KEY"] = ephemeral_secret
-        print("[FinGuard] Notice: Auto-generated ephemeral 48-byte SECRET_KEY for cloud runtime. To persist sessions across restarts, set SECRET_KEY in your Render dashboard.", flush=True)
+        print("[FinGuard] Notice: Auto-generated ephemeral 48-byte SECRET_KEY for cloud runtime.", flush=True)
 
     port_str = os.environ.get("PORT", "8000")
     try:
@@ -24,6 +31,6 @@ if __name__ == "__main__":
         port = 8000
 
     host = os.environ.get("HOST", "0.0.0.0")
-    print(f"[FinGuard] Successfully bound and listening on {host}:{port}", flush=True)
+    print(f"[FinGuard] Starting Uvicorn on {host}:{port}...", flush=True)
     uvicorn.run("backend.main:app", host=host, port=port, log_level="info")
 

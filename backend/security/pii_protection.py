@@ -36,12 +36,36 @@ class FinancialPIIProtector:
 
         if self.presidio_available:
             try:
-                self.analyzer = AnalyzerEngine()
+                # Safely probe for locally installed spaCy models without remote download attempts
+                chosen_model = None
+                try:
+                    import spacy
+                    installed = spacy.util.get_installed_models()
+                    for m in ["en_core_web_sm", "en_core_web_lg", "en_core_web_md"]:
+                        if m in installed:
+                            chosen_model = m
+                            break
+                except Exception:
+                    chosen_model = None
+
+                if chosen_model:
+                    from presidio_analyzer.nlp_engine import NlpEngineProvider
+                    nlp_conf = {"nlp_engine_name": "spacy", "models": [{"lang_code": "en", "model_name": chosen_model}]}
+                    provider = NlpEngineProvider(nlp_configuration=nlp_conf)
+                    self.analyzer = AnalyzerEngine(nlp_engine=provider.create_engine())
+                else:
+                    try:
+                        self.analyzer = AnalyzerEngine()
+                    except Exception as err:
+                        logger.warning(f"Presidio AnalyzerEngine skipped ({err}). Fast regex masking active.")
+                        self.analyzer = None
+
                 self.anonymizer = AnonymizerEngine()
-                self._register_custom_financial_recognizers()
+                if self.analyzer:
+                    self._register_custom_financial_recognizers()
             except Exception as e:
-                logger.error(f"Failed to initialize Presidio engines: {e}. Falling back to regex.")
-                self.presidio_available = False
+                logger.warning(f"Presidio model setup skipped: {e}. Active with regex pattern protection.")
+                self.analyzer = None
 
     def _register_custom_financial_recognizers(self):
         """Register custom recognizers for banking & financial crime domain."""

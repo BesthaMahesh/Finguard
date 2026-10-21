@@ -6,13 +6,18 @@ services:
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: python run.py
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
+      - key: PYTHONUNBUFFERED
+        value: "1"
       - key: ENVIRONMENT
         value: production
       - key: DEBUG
         value: false
+      - key: USE_LIGHTWEIGHT_EMBEDDINGS
+        value: "true"
       - key: DATABASE_URL
         value: sqlite:///./finguard.db
       - key: GROQ_API_KEY

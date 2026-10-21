@@ -21,31 +21,38 @@ from contextlib import asynccontextmanager
 # Setup structured logging
 setup_structured_logging()
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup tasks
-    Base.metadata.create_all(bind=engine)
+import asyncio
+
+async def _background_startup_tasks():
+    """Executes schema migrations, user provisioning, and model warming non-blockingly."""
     try:
         from backend.db.migrate_schema import apply_schema_migrations
         apply_schema_migrations()
     except Exception as e:
-        print(f"[FinGuard] Warning: Database schema migration check: {e}")
+        print(f"[FinGuard] Warning: Database schema migration check: {e}", flush=True)
 
     try:
         from backend.db.init_users import init_default_accounts
         init_default_accounts()
     except Exception as e:
-        print(f"[FinGuard] Warning: Failed to initialize default accounts on startup: {e}")
+        print(f"[FinGuard] Warning: Failed to initialize default accounts on startup: {e}", flush=True)
 
-    # Ensure ML Model Service is ready
     try:
         from backend.ml.model_service import model_service
         model_service._ensure_model()
     except Exception as e:
-        print(f"[FinGuard] Warning: ML model initialization skipped: {e}")
+        print(f"[FinGuard] Warning: ML model initialization skipped: {e}", flush=True)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Synchronous essential startup (table structure)
+    Base.metadata.create_all(bind=engine)
+    
+    # Launch migrations and model loading in background so port opens in milliseconds
+    asyncio.create_task(_background_startup_tasks())
+    
     yield
-    # Shutdown tasks (if needed in future)
+    # Shutdown tasks
 
 # In production, disable interactive docs unless explicitly enabled
 is_prod = settings.ENVIRONMENT.lower() == "production"

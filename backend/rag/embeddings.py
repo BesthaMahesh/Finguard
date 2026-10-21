@@ -12,7 +12,10 @@ _CACHED_ST_MODELS = {}
 
 def get_cached_sentence_transformer(model_name: str = "all-MiniLM-L6-v2"):
     global _CACHED_ST_MODELS
-    if os.environ.get("USE_LIGHTWEIGHT_EMBEDDINGS", "false").lower() in ("true", "1", "yes"):
+    # On Render or cloud environments with restricted memory/bandwidth, default to fast deterministic embeddings
+    is_cloud = bool(os.environ.get("RENDER")) or os.environ.get("ENVIRONMENT", "").lower() == "production"
+    default_mode = "true" if is_cloud else "false"
+    if os.environ.get("USE_LIGHTWEIGHT_EMBEDDINGS", default_mode).lower() in ("true", "1", "yes"):
         _CACHED_ST_MODELS[model_name] = None
         return None
 
