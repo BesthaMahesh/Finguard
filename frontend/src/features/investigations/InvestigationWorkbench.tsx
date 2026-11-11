@@ -172,7 +172,27 @@ export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ 
   const handleLaunchAdHocCase = async (txId: number) => {
     try {
       setLoading(true);
-      await api.analyzeRisk({ transaction_id: txId }, true);
+      let payload: any = { transaction_id: txId };
+      try {
+        const txDetail = await api.getTransactionDetail(txId);
+        if (txDetail) {
+          payload = {
+            transaction_id: txDetail.id,
+            step: txDetail.step || 1,
+            type: txDetail.type || 'TRANSFER',
+            amount: txDetail.amount || 0,
+            name_orig: txDetail.name_orig || 'C_UNKNOWN',
+            old_balance_org: txDetail.old_balance_org || 0,
+            new_balance_orig: txDetail.new_balance_orig || 0,
+            name_dest: txDetail.name_dest || 'C_UNKNOWN',
+            old_balance_dest: txDetail.old_balance_dest || 0,
+            new_balance_dest: txDetail.new_balance_dest || 0,
+          };
+        }
+      } catch (e) {
+        // Fallback to sending transaction_id alone
+      }
+      await api.analyzeRisk(payload, true);
       await loadCases();
     } catch (err) {
       console.error(err);
@@ -186,7 +206,28 @@ export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ 
     try {
       setRunningLiveWorkflow(true);
       setReviewErrorMsg(null);
-      const res = await api.analyzeRisk({ transaction_id: selectedCase.transaction_id }, true);
+      let payload: any = { transaction_id: selectedCase.transaction_id };
+      try {
+        const txDetail = await api.getTransactionDetail(selectedCase.transaction_id);
+        if (txDetail) {
+          payload = {
+            transaction_id: txDetail.id,
+            step: txDetail.step || 1,
+            type: txDetail.type || 'TRANSFER',
+            amount: txDetail.amount || 0,
+            name_orig: txDetail.name_orig || 'C_UNKNOWN',
+            old_balance_org: txDetail.old_balance_org || 0,
+            new_balance_orig: txDetail.new_balance_orig || 0,
+            name_dest: txDetail.name_dest || 'C_UNKNOWN',
+            old_balance_dest: txDetail.old_balance_dest || 0,
+            new_balance_dest: txDetail.new_balance_dest || 0,
+          };
+        }
+      } catch (e) {
+        // Fallback to sending transaction_id alone
+      }
+
+      const res = await api.analyzeRisk(payload, true);
       if (res && res.workflow_timeline && res.workflow_timeline.length > 0) {
         setLiveTimeline(res.workflow_timeline);
         setReviewSuccessMsg(`Multi-Agent Orchestration executed in real-time across ${res.workflow_timeline.length} specialized agents.`);

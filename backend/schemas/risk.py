@@ -4,14 +4,14 @@ from pydantic import BaseModel, Field
 class RiskAnalyzeRequest(BaseModel):
     transaction_id: Optional[int] = None
     step: Optional[int] = 1
-    type: str = Field("TRANSFER", description="Transaction type")
-    amount: float = Field(..., ge=0.0)
-    name_orig: str = Field(..., description="Origin account ID")
-    old_balance_org: float = Field(0.0, ge=0.0)
-    new_balance_orig: float = Field(0.0, ge=0.0)
-    name_dest: str = Field(..., description="Destination account ID")
-    old_balance_dest: float = Field(0.0, ge=0.0)
-    new_balance_dest: float = Field(0.0, ge=0.0)
+    type: Optional[str] = Field("TRANSFER", description="Transaction type")
+    amount: Optional[float] = Field(None, ge=0.0)
+    name_orig: Optional[str] = Field(None, description="Origin account ID")
+    old_balance_org: Optional[float] = Field(0.0, ge=0.0)
+    new_balance_orig: Optional[float] = Field(0.0, ge=0.0)
+    name_dest: Optional[str] = Field(None, description="Destination account ID")
+    old_balance_dest: Optional[float] = Field(0.0, ge=0.0)
+    new_balance_dest: Optional[float] = Field(0.0, ge=0.0)
     use_multi_agent: bool = Field(True, description="Run through full 9-agent LangGraph workflow")
 
 class RiskAnalyzeResponse(BaseModel):

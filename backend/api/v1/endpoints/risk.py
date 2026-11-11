@@ -16,15 +16,37 @@ def analyze_transaction_risk(
 
     raw_tx = {
         "step": request.step or 1,
-        "type": request.type,
-        "amount": request.amount,
-        "nameOrig": request.name_orig,
-        "oldbalanceOrg": request.old_balance_org,
-        "newbalanceOrig": request.new_balance_orig,
-        "nameDest": request.name_dest,
-        "oldbalanceDest": request.old_balance_dest,
-        "newbalanceDest": request.new_balance_dest,
+        "type": request.type or "TRANSFER",
+        "amount": request.amount if request.amount is not None else 0.0,
+        "nameOrig": request.name_orig or "C_UNKNOWN",
+        "oldbalanceOrg": request.old_balance_org or 0.0,
+        "newbalanceOrig": request.new_balance_orig or 0.0,
+        "nameDest": request.name_dest or "C_UNKNOWN",
+        "oldbalanceDest": request.old_balance_dest or 0.0,
+        "newbalanceDest": request.new_balance_dest or 0.0,
     }
+
+    # If transaction_id is provided, populate any missing fields from database
+    if request.transaction_id:
+        from backend.db.session import SessionLocal
+        from backend.db.models import Transaction
+        db = SessionLocal()
+        try:
+            tx = db.query(Transaction).filter_by(id=request.transaction_id).first()
+            if tx:
+                raw_tx["id"] = tx.id
+                raw_tx["step"] = tx.step
+                raw_tx["type"] = tx.type
+                raw_tx["amount"] = tx.amount
+                raw_tx["nameOrig"] = tx.name_orig
+                raw_tx["oldbalanceOrg"] = tx.old_balance_org
+                raw_tx["newbalanceOrig"] = tx.new_balance_orig
+                raw_tx["nameDest"] = tx.name_dest
+                raw_tx["oldbalanceDest"] = tx.old_balance_dest
+                raw_tx["newbalanceDest"] = tx.new_balance_dest
+                raw_tx["is_fraud"] = tx.is_fraud
+        finally:
+            db.close()
 
     if request.use_multi_agent:
         # Full 9-Agent LangGraph workflow execution
