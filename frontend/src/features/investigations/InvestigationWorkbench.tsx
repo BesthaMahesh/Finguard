@@ -17,6 +17,10 @@ import {
   Sparkles,
   HelpCircle,
   RefreshCw,
+  ChevronDown,
+  ChevronUp,
+  Play,
+  Zap,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { InvestigationCase, AgentTimelineStep, PolicyCitation, UserRole } from '../../types';
@@ -31,6 +35,86 @@ interface InvestigationWorkbenchProps {
   initialTxId?: number | null;
 }
 
+const AGENT_METADATA: Record<string, { role: string; layer: string; explanation: string }> = {
+  'SUPERVISOR AGENT': {
+    role: 'Workflow Orchestrator & Intent Planner',
+    layer: 'Layer 2: Orchestration & Control Plane',
+    explanation:
+      'Coordinates LangGraph workflow execution, assigns correlation IDs, enforces role-based access boundaries, and conditionally routes high-risk transactions to deep forensic analysis.',
+  },
+  'TRANSACTION INTAKE AGENT': {
+    role: 'Schema Validation & Boundary Ingestion',
+    layer: 'Layer 8: Data Sources & Ledger Interface',
+    explanation:
+      'Validates input payload fields, checks balance precision, formats transaction timestamps, and unpacks origin and destination counterparty metadata.',
+  },
+  'DATA QUALITY AGENT': {
+    role: 'LeakageGuard & Balance Invariant Checker',
+    layer: 'Layer 4: Financial Risk Intelligence',
+    explanation:
+      'Audits debit/credit sign consistency, checks non-negative balance constraints, and guarantees 0% target leakage between training and inference pipelines.',
+  },
+  'FRAUD DETECTION AGENT': {
+    role: 'Random Forest Inference & Rule Evaluator',
+    layer: 'Layer 4: Machine Learning Engine',
+    explanation:
+      'Executes Scikit-Learn Random Forest model inference and checks deterministic rules (RULE_LIQUIDATION_DRAIN, RULE_HIGH_VALUE_THRESHOLD, RULE_LEDGER_INCONSISTENCY).',
+  },
+  'RISK ASSESSMENT AGENT': {
+    role: 'Composite Risk Synthesizer',
+    layer: 'Layer 4: Risk Fusion & Checkpoints',
+    explanation:
+      'Synthesizes ML fraud probabilities and deterministic rule penalties into a 0-100 composite risk score; marks mandatory human-in-the-loop review checkpoints for scores >= 70.',
+  },
+  'INVESTIGATION AGENT': {
+    role: 'Forensic Ledger & Velocity Specialist',
+    layer: 'Layer 2: In-Depth Forensic Analysis',
+    explanation:
+      'Examines balance liquidation deltas, rapid pass-through velocity, cross-border or counterparty relationships, and historical account behavioral patterns.',
+  },
+  'POLICY & COMPLIANCE AGENT': {
+    role: 'ChromaDB Regulatory RAG Specialist',
+    layer: 'Layer 3: Knowledge & Memory Layer',
+    explanation:
+      'Executes semantic vector search across indexed AML/KYC directives, FATF typologies, and internal governance manuals to retrieve grounded statutory excerpts.',
+  },
+  'EXPLAINABILITY AGENT': {
+    role: 'TreeSHAP & Objective Narrative Synthesizer',
+    layer: 'Layer 4 & 2: Explainability & LLM Integration',
+    explanation:
+      'Extracts TreeSHAP feature attributions and uses Groq LLM to synthesize objective risk narratives strictly constrained against ungrounded or speculative guilt claims.',
+  },
+  'AUDIT & REPORTING AGENT': {
+    role: 'Dossier Compiler & SHA-256 Ledger Sealer',
+    layer: 'Layer 7: Governance, Security & Trust Layer',
+    explanation:
+      'Compiles the final structured investigation docket, verifies 4-Eyes requirements, and seals an immutable audit event using cryptographic SHA-256 hash chaining.',
+  },
+};
+
+const PRESET_REVIEW_TEMPLATES = [
+  {
+    label: '🚨 Escalate to SAR',
+    disposition: 'ESCALATE_TO_SAR',
+    note: 'Confirmed complete account liquidation matching AML-04 Section 2.1 typology. Origin balance dropped to zero with zero counterparty history. Escalated to compliance officer for FinCEN SAR filing.',
+  },
+  {
+    label: '❄️ Freeze Account',
+    disposition: 'FREEZE_ACCOUNT',
+    note: 'Critical risk score with rapid liquidation drain and high value exposure. Emergency freeze placed on origin account pending secondary identity verification under policy POL-AML-2024-04.',
+  },
+  {
+    label: '✅ Clear (False Positive)',
+    disposition: 'DISMISS_FALSE_POSITIVE',
+    note: 'Verified legitimate corporate payroll transfer against corporate invoice history. Source of wealth confirmed; cleared as authorized false positive.',
+  },
+  {
+    label: '📋 Request Additional KYC',
+    disposition: 'REQUEST_ADDITIONAL_KYC',
+    note: 'Unusual transaction velocity detected. Origin account flagged for enhanced customer due diligence (EDD) and updated source of wealth declaration.',
+  },
+];
+
 export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ userRole, initialTxId }) => {
   const [cases, setCases] = useState<InvestigationCase[]>([]);
   const [selectedCase, setSelectedCase] = useState<InvestigationCase | null>(null);
@@ -38,12 +122,24 @@ export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ 
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
 
+  // Live multi-agent workflow state
+  const [liveTimeline, setLiveTimeline] = useState<AgentTimelineStep[] | null>(null);
+  const [expandedStepIndex, setExpandedStepIndex] = useState<number | null>(null);
+  const [runningLiveWorkflow, setRunningLiveWorkflow] = useState(false);
+
   // Disposition form states
   const [disposition, setDisposition] = useState('ESCALATE_TO_SAR');
   const [notes, setNotes] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewSuccessMsg, setReviewSuccessMsg] = useState<string | null>(null);
   const [reviewErrorMsg, setReviewErrorMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLiveTimeline(null);
+    setExpandedStepIndex(null);
+    setReviewSuccessMsg(null);
+    setReviewErrorMsg(null);
+  }, [selectedCase?.id]);
 
   useEffect(() => {
     loadCases();
@@ -85,6 +181,23 @@ export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ 
     }
   };
 
+  const handleRunLiveMultiAgent = async () => {
+    if (!selectedCase) return;
+    try {
+      setRunningLiveWorkflow(true);
+      setReviewErrorMsg(null);
+      const res = await api.analyzeRisk({ transaction_id: selectedCase.transaction_id }, true);
+      if (res && res.workflow_timeline && res.workflow_timeline.length > 0) {
+        setLiveTimeline(res.workflow_timeline);
+        setReviewSuccessMsg(`Multi-Agent Orchestration executed in real-time across ${res.workflow_timeline.length} specialized agents.`);
+      }
+    } catch (err: any) {
+      setReviewErrorMsg(`Failed to execute real-time multi-agent workflow: ${err.message}`);
+    } finally {
+      setRunningLiveWorkflow(false);
+    }
+  };
+
   const handleDispositionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCase) return;
@@ -113,6 +226,8 @@ export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ 
   const timeline: AgentTimelineStep[] = selectedCase?.agent_workflow_trace_json
     ? JSON.parse(selectedCase.agent_workflow_trace_json)
     : [];
+
+  const activeTimeline: AgentTimelineStep[] = liveTimeline || timeline;
 
   const policyCitations: PolicyCitation[] = selectedCase?.policy_citations_json
     ? JSON.parse(selectedCase.policy_citations_json)
@@ -295,38 +410,102 @@ export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ 
               </div>
 
               {/* Investigation Workflow Timeline */}
-              {timeline.length > 0 && (
+              {activeTimeline.length > 0 && (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
-                      <Clock className="h-3.5 w-3.5 text-sky-400" />
-                      Investigation Workflow Steps
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      Sequential multi-agent execution
-                    </span>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-sky-400" />
+                        Investigation Workflow Steps ({activeTimeline.length} Agents)
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-mono block">
+                        Sequential multi-agent execution • Click any agent to inspect inner logic
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleRunLiveMultiAgent}
+                      disabled={runningLiveWorkflow}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/60 text-sky-300 text-xs font-mono transition cursor-pointer disabled:opacity-50 shadow-sm"
+                      title="Triggers real-time LangGraph multi-agent execution across all 9 agents"
+                    >
+                      {runningLiveWorkflow ? (
+                        <>
+                          <RefreshCw className="h-3.5 w-3.5 animate-spin text-sky-400" />
+                          <span>Running 9 Agents...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="h-3.5 w-3.5 text-amber-400" />
+                          <span>Run Live 9-Agent Analysis</span>
+                        </>
+                      )}
+                    </button>
                   </div>
 
                   <div className="space-y-2">
-                    {timeline.map((step, idx) => (
-                      <div
-                        key={idx}
-                        className="p-3 rounded-lg bg-slate-900/60 border border-slate-800 text-xs space-y-1"
-                      >
-                        <div className="flex items-center justify-between font-mono">
-                          <span className="font-semibold text-sky-300 flex items-center gap-1.5">
-                            <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
-                            {step.agent.replace(/_/g, ' ').toUpperCase()}
-                          </span>
-                          <span className="text-[10px] text-slate-500">
-                            {step.duration_ms}ms • {step.status}
-                          </span>
+                    {activeTimeline.map((step, idx) => {
+                      const agentKey = step.agent.replace(/_/g, ' ').toUpperCase();
+                      const meta = AGENT_METADATA[agentKey] || {
+                        role: 'Specialized Risk Agent',
+                        layer: 'Layer 2: Orchestration Plane',
+                        explanation: step.output_summary,
+                      };
+                      const isExpanded = expandedStepIndex === idx;
+
+                      return (
+                        <div
+                          key={idx}
+                          className="rounded-lg bg-slate-900/60 border border-slate-800 hover:border-slate-700 text-xs transition"
+                        >
+                          <div
+                            onClick={() => setExpandedStepIndex(isExpanded ? null : idx)}
+                            className="p-3 flex items-center justify-between font-mono cursor-pointer select-none"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="h-2 w-2 rounded-full bg-sky-400 shrink-0" />
+                              <span className="font-semibold text-sky-300">
+                                {agentKey}
+                              </span>
+                              <span className="text-[10px] text-slate-500 font-sans hidden sm:inline">
+                                • {meta.role}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-slate-400">
+                                {step.duration_ms}ms • <span className="text-emerald-400">{step.status}</span>
+                              </span>
+                              {isExpanded ? (
+                                <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
+                              ) : (
+                                <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="px-3 pb-3 text-[11px] text-slate-300 leading-relaxed border-t border-slate-800/50 pt-2 space-y-1.5">
+                            <p className="font-mono text-slate-200">
+                              {step.output_summary}
+                            </p>
+
+                            {isExpanded && (
+                              <div className="mt-2 p-2.5 rounded bg-[#070b14] border border-slate-800 space-y-1 font-sans text-[11px] animate-in fade-in">
+                                <div className="text-sky-400 font-medium flex items-center gap-1.5">
+                                  <span className="font-mono text-[10px] px-1 py-0.5 rounded bg-sky-950 border border-sky-800 text-sky-300">
+                                    {meta.layer}
+                                  </span>
+                                  <span>{meta.role}</span>
+                                </div>
+                                <p className="text-slate-400 leading-normal">
+                                  {meta.explanation}
+                                </p>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <p className="text-[11px] text-slate-300 leading-relaxed pt-0.5">
-                          {step.output_summary}
-                        </p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -395,6 +574,30 @@ export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ 
                         Pending — Request Additional Source of Wealth Documentation
                       </option>
                     </select>
+                  </div>
+
+                  {/* One-Click Presets for Demo */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] text-slate-400">
+                      <span>Quick Demo Findings Templates:</span>
+                      <span className="text-[10px] text-slate-500 font-mono">1-Click Auto-Fill</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {PRESET_REVIEW_TEMPLATES.map((tmpl, tIdx) => (
+                        <button
+                          key={tIdx}
+                          type="button"
+                          onClick={() => {
+                            setDisposition(tmpl.disposition);
+                            setNotes(tmpl.note);
+                            if (reviewErrorMsg) setReviewErrorMsg(null);
+                          }}
+                          className="px-2.5 py-1 rounded-md bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[11px] font-medium transition cursor-pointer flex items-center gap-1 shadow-sm"
+                        >
+                          {tmpl.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="space-y-1">
