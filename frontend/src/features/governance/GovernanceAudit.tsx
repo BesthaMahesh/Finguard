@@ -3,6 +3,7 @@ import {
   FileCheck,
   Search,
   ShieldAlert,
+  ShieldCheck,
   CheckCircle2,
   XCircle,
   Lock,
@@ -12,6 +13,7 @@ import {
   Clock,
   User,
   Shield,
+  Layers,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { AuditEvent } from '../../types';
@@ -26,6 +28,32 @@ export const GovernanceAudit: React.FC = () => {
   const [search, setSearch] = useState('');
   const [actionFilter, setActionFilter] = useState('');
   const [outcomeFilter, setOutcomeFilter] = useState('');
+  const [verifyingChain, setVerifyingChain] = useState(false);
+  const [chainResult, setChainResult] = useState<{
+    status: string;
+    chain_intact: boolean;
+    total_events_verified: number;
+    genesis_hash?: string;
+    head_hash?: string;
+    details: string;
+  } | null>(null);
+
+  const handleVerifyChain = async () => {
+    try {
+      setVerifyingChain(true);
+      const res = await api.verifyAuditChain();
+      setChainResult(res);
+    } catch (e: any) {
+      setChainResult({
+        status: 'ERROR',
+        chain_intact: false,
+        total_events_verified: 0,
+        details: e.message || 'Verification failed',
+      });
+    } finally {
+      setVerifyingChain(false);
+    }
+  };
 
   useEffect(() => {
     loadAuditEvents();
@@ -67,22 +95,73 @@ export const GovernanceAudit: React.FC = () => {
         breadcrumbs={['FinGuard', 'Governance', 'Security & Audit']}
         badge={`${total} Stored Events`}
         actions={
-          <button
-            onClick={loadAuditEvents}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition cursor-pointer"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Refresh Log
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleVerifyChain}
+              disabled={verifyingChain}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-600/70 text-emerald-300 text-xs font-mono font-semibold transition cursor-pointer disabled:opacity-50"
+            >
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+              <span>{verifyingChain ? 'Verifying Hashes...' : 'Verify Chain Integrity'}</span>
+            </button>
+            <button
+              onClick={loadAuditEvents}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition cursor-pointer"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Refresh Log
+            </button>
+          </div>
         }
       />
+
+      {/* Verification Result Banner */}
+      {chainResult && (
+        <div
+          className={`p-4 rounded-xl border flex items-start justify-between gap-3 ${
+            chainResult.chain_intact
+              ? 'bg-emerald-950/60 border-emerald-600 text-emerald-200'
+              : 'bg-rose-950/60 border-rose-600 text-rose-200'
+          }`}
+        >
+          <div className="flex items-start gap-3">
+            {chainResult.chain_intact ? (
+              <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
+            ) : (
+              <XCircle className="h-5 w-5 text-rose-400 shrink-0 mt-0.5" />
+            )}
+            <div>
+              <div className="text-xs font-bold font-mono uppercase tracking-wider">
+                {chainResult.chain_intact
+                  ? `Cryptographic SHA-256 Ledger Integrity Verified (${chainResult.total_events_verified} Events Intact)`
+                  : 'Ledger Tamper / Anomaly Detected'}
+              </div>
+              <div className="text-[11px] mt-0.5 text-slate-300 font-sans">
+                {chainResult.details}
+              </div>
+              {chainResult.head_hash && (
+                <div className="text-[10px] font-mono text-slate-400 mt-1 truncate max-w-xl">
+                  Head Root Hash: {chainResult.head_hash}
+                </div>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => setChainResult(null)}
+            className="text-slate-400 hover:text-white text-xs font-mono"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Role-Based Access Control Entitlements Table */}
       <div className="rounded-xl bg-[#11192e] border border-slate-800/80 p-5 space-y-3 shadow-sm">
         <div>
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
             <Lock className="h-4 w-4 text-sky-400" />
-            Active Role Entitlements & Permissions Matrix
+            Active Role Entitlements & Permissions Matrix (4 Server-Enforced Roles)
           </h3>
           <p className="text-xs text-slate-400">
             Authorization enforced by backend API dependencies on every request
@@ -93,37 +172,59 @@ export const GovernanceAudit: React.FC = () => {
           <table className="w-full text-left text-xs font-mono">
             <thead className="bg-[#0b1220] text-slate-400 border-b border-slate-800 font-sans text-[10px] uppercase">
               <tr>
-                <th className="py-2.5 px-3">Role</th>
+                <th className="py-2.5 px-3">Role Persona</th>
                 <th className="py-2.5 px-3">Risk Dashboard</th>
-                <th className="py-2.5 px-3">Transactions</th>
-                <th className="py-2.5 px-3">Investigations & Review</th>
-                <th className="py-2.5 px-3">Risk Assistant & Docs</th>
-                <th className="py-2.5 px-3">Audit Logs</th>
-                <th className="py-2.5 px-3">User & System Admin</th>
+                <th className="py-2.5 px-3">Transactions & Agents</th>
+                <th className="py-2.5 px-3">Case Dispositions</th>
+                <th className="py-2.5 px-3">Assistant & Policies</th>
+                <th className="py-2.5 px-3">Immutable Audit Trail</th>
+                <th className="py-2.5 px-3">System & User Admin</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-sans">
               <tr className="hover:bg-slate-800/20 transition">
                 <td className="py-2.5 px-3 font-bold text-sky-400 font-mono">
-                  USER (Standard User)
+                  analyst (Sarah Chen)
                 </td>
                 <td className="py-2.5 px-3 text-emerald-400 font-bold">YES</td>
+                <td className="py-2.5 px-3 text-emerald-400 font-bold">YES (Analyze)</td>
+                <td className="py-2.5 px-3 text-amber-400 font-bold">Read-Only (No Disposition)</td>
                 <td className="py-2.5 px-3 text-emerald-400 font-bold">YES</td>
-                <td className="py-2.5 px-3 text-emerald-400 font-bold">YES (Review Notes)</td>
+                <td className="py-2.5 px-3 text-rose-400 font-bold">NO (Restricted)</td>
+                <td className="py-2.5 px-3 text-rose-400 font-bold">NO (Restricted)</td>
+              </tr>
+              <tr className="hover:bg-slate-800/20 transition">
+                <td className="py-2.5 px-3 font-bold text-amber-400 font-mono">
+                  investigator (Marcus Vance)
+                </td>
                 <td className="py-2.5 px-3 text-emerald-400 font-bold">YES</td>
-                <td className="py-2.5 px-3 text-rose-400 font-bold">NO (Restricted to Admin)</td>
+                <td className="py-2.5 px-3 text-emerald-400 font-bold">YES (Analyze)</td>
+                <td className="py-2.5 px-3 text-emerald-400 font-bold">YES (4-Eyes Authorized)</td>
+                <td className="py-2.5 px-3 text-emerald-400 font-bold">YES</td>
+                <td className="py-2.5 px-3 text-rose-400 font-bold">NO (Restricted)</td>
+                <td className="py-2.5 px-3 text-rose-400 font-bold">NO (Restricted)</td>
+              </tr>
+              <tr className="hover:bg-slate-800/20 transition">
+                <td className="py-2.5 px-3 font-bold text-emerald-400 font-mono">
+                  auditor (Elena Rostova)
+                </td>
+                <td className="py-2.5 px-3 text-emerald-400 font-bold">YES</td>
+                <td className="py-2.5 px-3 text-slate-300 font-bold">Read-Only</td>
+                <td className="py-2.5 px-3 text-slate-300 font-bold">Read-Only Dossiers</td>
+                <td className="py-2.5 px-3 text-emerald-400 font-bold">YES</td>
+                <td className="py-2.5 px-3 text-emerald-400 font-bold">YES (Full & Hash Verify)</td>
                 <td className="py-2.5 px-3 text-rose-400 font-bold">NO (Restricted)</td>
               </tr>
               <tr className="hover:bg-slate-800/20 transition">
                 <td className="py-2.5 px-3 font-bold text-purple-400 font-mono">
-                  ADMIN (Administrator)
+                  administrator (Mahesh / Admin)
                 </td>
                 <td className="py-2.5 px-3 text-emerald-400 font-bold">YES</td>
-                <td className="py-2.5 px-3 text-emerald-400 font-bold">YES</td>
                 <td className="py-2.5 px-3 text-emerald-400 font-bold">YES (Full)</td>
+                <td className="py-2.5 px-3 text-emerald-400 font-bold">YES (Oversight)</td>
                 <td className="py-2.5 px-3 text-emerald-400 font-bold">YES (Full)</td>
-                <td className="py-2.5 px-3 text-emerald-400 font-bold">YES (Full)</td>
-                <td className="py-2.5 px-3 text-emerald-400 font-bold">YES (Manage Users & Config)</td>
+                <td className="py-2.5 px-3 text-emerald-400 font-bold">YES (Full & Hash Verify)</td>
+                <td className="py-2.5 px-3 text-emerald-400 font-bold">YES (Full Control)</td>
               </tr>
             </tbody>
           </table>

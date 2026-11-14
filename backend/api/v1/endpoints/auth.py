@@ -58,16 +58,25 @@ def _record_audit_log(
     details: dict = None
 ):
     try:
+        prev = db.query(AuditEvent).order_by(AuditEvent.timestamp.desc()).first()
+        prev_hash = prev.event_hash if (prev and prev.event_hash) else "GENESIS_ROOT_HASH_00000000"
+        now_utc = datetime.now(timezone.utc)
+        corr_id = str(uuid.uuid4())
+        raw_sig = f"{corr_id}:{action}:{target_id}:{prev_hash}:{now_utc.isoformat()}"
+        curr_hash = hashlib.sha256(raw_sig.encode("utf-8")).hexdigest()
+
         ev = AuditEvent(
-            correlation_id=str(uuid.uuid4()),
+            correlation_id=corr_id,
             actor_id=actor_id,
             actor_role=actor_role,
             action=action,
             target_type=target_type,
             target_id=target_id,
             outcome=outcome,
+            event_hash=curr_hash,
+            previous_hash=prev_hash,
             details_json=json.dumps(details or {}),
-            timestamp=datetime.utcnow()
+            timestamp=now_utc
         )
         db.add(ev)
         db.commit()

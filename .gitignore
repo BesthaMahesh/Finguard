@@ -37,9 +37,8 @@ models/*.joblib
 models/*.pkl
 *.sqlite
 *.db
-!finguard.db
-!chroma_db
-!chroma_db/**
+finguard.db
+chroma_db/
 
 # Node & Frontend
 node_modules/

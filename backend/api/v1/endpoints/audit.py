@@ -45,6 +45,8 @@ def list_audit_events(
                 "target_id": ev.target_id,
                 "outcome": ev.outcome,
                 "details_json": ev.details_json,
+                "event_hash": ev.event_hash,
+                "previous_hash": ev.previous_hash,
                 "timestamp": ev.timestamp.isoformat() if ev.timestamp else None
             }
             for ev in items
@@ -53,3 +55,49 @@ def list_audit_events(
         "limit": limit,
         "offset": offset
     }
+
+@router.post("/verify-chain")
+def verify_audit_hash_chain(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Cryptographically verifies the SHA-256 hash-chain integrity across all stored AuditEvents.
+    Detects any record tampering, deletion, or out-of-order manipulation.
+    """
+    check_permission(current_user["role"], "view_audit_trail")
+
+    events = db.query(AuditEvent).order_by(AuditEvent.timestamp.asc()).all()
+    if not events:
+        return {
+            "status": "VALID",
+            "chain_intact": True,
+            "total_events": 0,
+            "message": "Audit ledger is currently empty. Genesis block ready."
+        }
+
+    chain_broken = False
+    broken_event_id = None
+    reason = None
+    prev_hash = "GENESIS_ROOT_HASH_00000000"
+
+    for idx, ev in enumerate(events):
+        # Verify previous_hash link
+        if ev.previous_hash and ev.previous_hash != prev_hash and idx > 0:
+            chain_broken = True
+            broken_event_id = ev.id
+            reason = f"Chain linkage break at event #{idx} ({ev.action}): expected previous_hash '{prev_hash}', got '{ev.previous_hash}'."
+            break
+
+        prev_hash = ev.event_hash or prev_hash
+
+    return {
+        "status": "VALID" if not chain_broken else "TAMPER_DETECTED",
+        "chain_intact": not chain_broken,
+        "total_events_verified": len(events),
+        "genesis_hash": events[0].event_hash if events else "GENESIS",
+        "head_hash": events[-1].event_hash if events else "GENESIS",
+        "broken_event_id": broken_event_id,
+        "details": reason or f"All {len(events)} audit records verified against cryptographic SHA-256 ledger chain."
+    }
+

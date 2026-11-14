@@ -20,6 +20,7 @@ class InvestigationState(TypedDict):
     intake_status: str
     validated_transaction: Dict[str, Any]
     data_quality_report: Dict[str, Any]
+    market_credit_risk: Dict[str, Any]
     
     model_prediction: Dict[str, Any]
     risk_assessment: Dict[str, Any]

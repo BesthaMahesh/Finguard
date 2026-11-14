@@ -60,6 +60,12 @@ export async function apiFetch(path: string, options: RequestInit = {}, timeoutM
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let slowTimer: any = null;
+  if (typeof window !== 'undefined') {
+    slowTimer = setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('finguard_cold_start', { detail: { waking: true } }));
+    }, 2500);
+  }
 
   try {
     const res = await fetch(fullUrl, {
@@ -81,6 +87,10 @@ export async function apiFetch(path: string, options: RequestInit = {}, timeoutM
     throw err;
   } finally {
     clearTimeout(timer);
+    if (slowTimer) clearTimeout(slowTimer);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('finguard_cold_start', { detail: { waking: false } }));
+    }
   }
 }
 
@@ -107,6 +117,13 @@ const getHeaders = () => {
 
 async function handleResponse<T>(res: Response): Promise<T> {
   if (!res.ok) {
+    if (res.status === 401) {
+      setAuthToken(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('finguard_user');
+        window.dispatchEvent(new CustomEvent('finguard_auth_expired'));
+      }
+    }
     const errData = await res.json().catch(() => ({}));
     let msg = '';
     if (typeof errData.detail === 'string') {
@@ -347,6 +364,21 @@ export const api = {
     return handleResponse(res);
   },
 
+  async verifyAuditChain(): Promise<{
+    status: string;
+    chain_intact: boolean;
+    total_events_verified: number;
+    genesis_hash?: string;
+    head_hash?: string;
+    details: string;
+  }> {
+    const res = await apiFetch(`${API_BASE}/audit/verify-chain`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    return handleResponse(res);
+  },
+
   // Observability
   async getObservabilitySummary(): Promise<ObservabilitySummary> {
     const res = await apiFetch(`${API_BASE}/observability/summary`, { headers: getHeaders() });
@@ -441,5 +473,46 @@ export const api = {
   async getReadiness(): Promise<{ status: string; database: string; model_engine: string; knowledge_rag: string }> {
     const res = await apiFetch(`${API_BASE}/ready`, { headers: getHeaders() });
     return handleResponse(res);
+  },
+
+  // Agent Orchestration & Runs
+  async getAgentRun(runId: string): Promise<any> {
+    const res = await apiFetch(`${API_BASE}/agents/runs/${runId}`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  async getCaseAgentTrace(caseId: string): Promise<any> {
+    const res = await apiFetch(`${API_BASE}/cases/${caseId}/agent-trace`, { headers: getHeaders() });
+    return handleResponse(res);
+  },
+
+  // Transaction Management
+  async createTransaction(payload: any): Promise<any> {
+    const res = await apiFetch(`${API_BASE}/transactions`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+    return handleResponse(res);
+  },
+
+  async uploadTransactionsCSV(file: File): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = localStorage.getItem('finguard_token');
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const base = getApiBase();
+    const res = await fetch(`${base}/transactions/upload-csv`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to upload CSV');
+    }
+    return res.json();
   },
 };

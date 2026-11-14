@@ -190,6 +190,32 @@ export const KnowledgeBase: React.FC = () => {
     { id: 'dataset_documentation', label: 'Dataset Docs' },
   ];
 
+  const getDocProvenanceBadge = (doc: any) => {
+    const isOfficial = doc.source_type === 'official_regulation' && (doc.file_type === 'PDF' || doc.source_url);
+    if (isOfficial) {
+      return {
+        text: 'Official Regulation',
+        cls: 'bg-indigo-950/90 text-indigo-300 border-indigo-800/90'
+      };
+    }
+    if (doc.source_type === 'research') {
+      return {
+        text: 'Academic Research',
+        cls: 'bg-purple-950/90 text-purple-300 border-purple-800/90'
+      };
+    }
+    if (doc.source_type === 'dataset_documentation') {
+      return {
+        text: 'Dataset Documentation',
+        cls: 'bg-emerald-950/90 text-emerald-300 border-emerald-800/90'
+      };
+    }
+    return {
+      text: 'Internal Policy (synthetic)',
+      cls: 'bg-amber-950/90 text-amber-300 border-amber-800/90'
+    };
+  };
+
   return (
     <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 max-w-7xl mx-auto">
       {/* Top Banner Header */}
@@ -269,16 +295,26 @@ export const KnowledgeBase: React.FC = () => {
             <FileText className="h-4 w-4 text-sky-400" />
           </div>
           <div className="text-2xl font-bold text-slate-100 font-mono">
-            {manifestStatus?.manifest.total_indexed ?? documents.length}
+            {loading ? (
+              <div className="h-7 w-16 bg-slate-800 animate-pulse rounded my-1" />
+            ) : (
+              manifestStatus?.manifest.total_indexed ?? documents.length
+            )}
           </div>
           <div className="text-[11px] text-slate-500 mt-1 flex items-center gap-1.5">
-            <span className="text-emerald-400 font-medium">
-              {documents.filter(d => d.file_type === 'PDF').length} PDFs
-            </span>
-            <span>•</span>
-            <span className="text-sky-400 font-medium">
-              {documents.filter(d => d.file_type === 'MD').length} Markdown
-            </span>
+            {loading ? (
+              <div className="h-3 w-24 bg-slate-800/80 animate-pulse rounded" />
+            ) : (
+              <>
+                <span className="text-emerald-400 font-medium">
+                  {documents.filter(d => d.file_type === 'PDF').length} PDFs
+                </span>
+                <span>•</span>
+                <span className="text-sky-400 font-medium">
+                  {documents.filter(d => d.file_type === 'MD').length} Markdown
+                </span>
+              </>
+            )}
           </div>
         </div>
 
@@ -288,10 +324,18 @@ export const KnowledgeBase: React.FC = () => {
             <Layers className="h-4 w-4 text-emerald-400" />
           </div>
           <div className="text-2xl font-bold text-emerald-400 font-mono">
-            {manifestStatus?.manifest.total_chunks ?? documents.reduce((acc, d) => acc + (d.chunk_count || 0), 0)}
+            {loading ? (
+              <div className="h-7 w-20 bg-slate-800 animate-pulse rounded my-1" />
+            ) : (
+              manifestStatus?.manifest.total_chunks ?? documents.reduce((acc, d) => acc + (d.chunk_count || 0), 0)
+            )}
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
-            Chroma Vector Collection Active
+            {loading ? (
+              <div className="h-3 w-28 bg-slate-800/80 animate-pulse rounded" />
+            ) : (
+              'Chroma Vector Collection Active'
+            )}
           </div>
         </div>
 
@@ -301,10 +345,18 @@ export const KnowledgeBase: React.FC = () => {
             <Database className="h-4 w-4 text-amber-400" />
           </div>
           <div className="text-sm font-semibold text-slate-200 font-mono truncate">
-            {manifestStatus?.embedding_model || 'all-MiniLM-L6-v2'}
+            {loading ? (
+              <div className="h-5 w-32 bg-slate-800 animate-pulse rounded my-1" />
+            ) : (
+              manifestStatus?.embedding_model || 'all-MiniLM-L6-v2'
+            )}
           </div>
           <div className="text-[11px] text-slate-500 mt-1">
-            384-dimensional dense vectors
+            {loading ? (
+              <div className="h-3 w-24 bg-slate-800/80 animate-pulse rounded" />
+            ) : (
+              '384-dimensional dense vectors'
+            )}
           </div>
         </div>
 
@@ -314,11 +366,21 @@ export const KnowledgeBase: React.FC = () => {
             <CheckCircle className="h-4 w-4 text-teal-400" />
           </div>
           <div className="text-base font-semibold text-teal-400 flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-teal-400 animate-pulse" />
-            {manifestStatus?.status || 'HEALTHY'}
+            {loading ? (
+              <div className="h-5 w-24 bg-slate-800 animate-pulse rounded my-1" />
+            ) : (
+              <>
+                <span className="h-2 w-2 rounded-full bg-teal-400 animate-pulse" />
+                {manifestStatus?.status || 'HEALTHY'}
+              </>
+            )}
           </div>
           <div className="text-[11px] text-slate-500 mt-1 truncate">
-            Last update: {manifestStatus?.manifest.last_updated ? new Date(manifestStatus.manifest.last_updated).toLocaleTimeString() : 'Recent'}
+            {loading ? (
+              <div className="h-3 w-28 bg-slate-800/80 animate-pulse rounded" />
+            ) : (
+              `Last update: ${manifestStatus?.manifest.last_updated ? new Date(manifestStatus.manifest.last_updated).toLocaleTimeString() : 'Recent'}`
+            )}
           </div>
         </div>
       </div>
@@ -432,17 +494,14 @@ export const KnowledgeBase: React.FC = () => {
                                 </div>
                                 <div className="text-[11px] text-slate-500 truncate flex items-center gap-2 mt-0.5">
                                   <span className="font-mono">{doc.file_name}</span>
-                                  {doc.source_type && (
-                                    <span
-                                      className={`px-1 rounded text-[9px] uppercase font-mono ${
-                                        doc.source_type === 'official_regulation'
-                                          ? 'bg-indigo-950 text-indigo-300 border border-indigo-800'
-                                          : 'bg-amber-950 text-amber-300 border border-amber-800'
-                                      }`}
-                                    >
-                                      {doc.source_type === 'official_regulation' ? 'Official' : 'Sample/Internal'}
-                                    </span>
-                                  )}
+                                  {doc.source_type && (() => {
+                                    const badge = getDocProvenanceBadge(doc);
+                                    return (
+                                      <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono border ${badge.cls}`}>
+                                        {badge.text}
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
                               </div>
                             </div>
@@ -683,9 +742,9 @@ export const KnowledgeBase: React.FC = () => {
                 </span>
               </div>
               <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-                <span className="text-slate-400 block text-[10px] uppercase font-mono font-semibold">Source Type</span>
-                <span className="text-slate-100 capitalize font-medium text-xs mt-0.5 block truncate">
-                  {selectedDoc.source_type.replace(/_/g, ' ')}
+                <span className="text-slate-400 block text-[10px] uppercase font-mono font-semibold">Provenance & Status</span>
+                <span className="text-slate-100 font-medium text-xs mt-0.5 block truncate">
+                  {getDocProvenanceBadge(selectedDoc).text}
                 </span>
               </div>
             </div>

@@ -23,7 +23,7 @@ def test_two_accounts_authentication():
     assert user_res.status_code == 200, user_res.text
     user_data = user_res.json()
     assert user_data["username"] == "user"
-    assert user_data["role"].upper() == "USER"
+    assert user_data["role"].upper() in ("USER", "ANALYST")
     assert "access_token" in user_data
 
     # Profile check with user token

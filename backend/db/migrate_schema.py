@@ -47,6 +47,44 @@ def apply_schema_migrations():
                         except Exception as e:
                             logger.error(f"[Migration] Failed to add column {col_name} to {table_name}: {e}")
 
+            # Ensure transactions.is_fraud is nullable (for SQLite)
+            if "transactions" in existing_tables:
+                tx_cols = inspector.get_columns("transactions")
+                for c in tx_cols:
+                    if c["name"] == "is_fraud" and not c.get("nullable", True):
+                        logger.info("[Migration] Relaxing NOT NULL on transactions.is_fraud...")
+                        try:
+                            conn.exec_driver_sql("PRAGMA foreign_keys=off;")
+                            conn.exec_driver_sql("""
+                            CREATE TABLE IF NOT EXISTS transactions_migrated (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                step INTEGER,
+                                type VARCHAR,
+                                amount FLOAT,
+                                name_orig VARCHAR,
+                                old_balance_org FLOAT,
+                                new_balance_orig FLOAT,
+                                name_dest VARCHAR,
+                                old_balance_dest FLOAT,
+                                new_balance_dest FLOAT,
+                                is_fraud INTEGER,
+                                is_flagged_fraud INTEGER DEFAULT 0,
+                                predicted_fraud INTEGER DEFAULT 0,
+                                fraud_probability FLOAT DEFAULT 0.0,
+                                risk_score FLOAT DEFAULT 0.0,
+                                risk_level VARCHAR DEFAULT 'LOW',
+                                status VARCHAR DEFAULT 'UNREVIEWED',
+                                rule_flags TEXT,
+                                created_at DATETIME
+                            );
+                            """)
+                            conn.exec_driver_sql("INSERT INTO transactions_migrated SELECT * FROM transactions;")
+                            conn.exec_driver_sql("DROP TABLE transactions;")
+                            conn.exec_driver_sql("ALTER TABLE transactions_migrated RENAME TO transactions;")
+                            conn.exec_driver_sql("PRAGMA foreign_keys=on;")
+                        except Exception as e:
+                            logger.warning(f"[Migration] Table migration notice: {e}")
+
             conn.commit()
             logger.info("[Migration] Database schema verification and migration completed.")
     except Exception as ex:

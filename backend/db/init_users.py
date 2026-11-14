@@ -26,7 +26,7 @@ def init_default_accounts():
                 "username": "user",
                 "email": "user@finguard.local",
                 "full_name": "Financial Risk Analyst",
-                "role": "USER",
+                "role": "analyst",
                 "is_active": True,
                 "password": os.environ.get("DEFAULT_USER_PASSWORD", "12345"),
             },
@@ -34,16 +34,16 @@ def init_default_accounts():
                 "username": "admin",
                 "email": "admin@finguard.local",
                 "full_name": "Enterprise Risk Administrator",
-                "role": "ADMIN",
+                "role": "administrator",
                 "is_active": True,
                 "password": os.environ.get("DEFAULT_ADMIN_PASSWORD", "123456"),
             },
-            # Backward-compatibility legacy accounts for tests
+            # 4-Role Enterprise Personas with Strict RBAC Permissions
             {
                 "username": "analyst",
                 "email": "sarah.chen@finguard.internal",
                 "full_name": "Sarah Chen (Risk Analyst)",
-                "role": "USER",
+                "role": "analyst",
                 "is_active": True,
                 "password": "analyst123",
             },
@@ -51,7 +51,7 @@ def init_default_accounts():
                 "username": "investigator",
                 "email": "marcus.vance@finguard.internal",
                 "full_name": "Marcus Vance (Senior Investigator)",
-                "role": "USER",
+                "role": "investigator",
                 "is_active": True,
                 "password": "investigator123",
             },
@@ -59,7 +59,7 @@ def init_default_accounts():
                 "username": "auditor",
                 "email": "elena.rostova@finguard.internal",
                 "full_name": "Elena Rostova (Compliance Auditor)",
-                "role": "USER",
+                "role": "auditor",
                 "is_active": True,
                 "password": "auditor123",
             },
@@ -86,15 +86,13 @@ def init_default_accounts():
                 db.add(new_user)
                 created_count += 1
             else:
-                # Update role if legacy or ensure password hash is salted and matches target password
-                if existing_user.username in ("user", "admin"):
+                # Update role and ensure password hash is salted and matches target password
+                if existing_user.role != acc["role"]:
                     existing_user.role = acc["role"]
-                    existing_user.full_name = acc["full_name"]
-                    existing_user.email = acc["email"]
-                    if not verify_password(acc["password"], existing_user.hashed_password):
-                        existing_user.hashed_password = hash_password(acc["password"])
-                        updated_count += 1
-                elif not existing_user.hashed_password or "$" not in existing_user.hashed_password:
+                    updated_count += 1
+                existing_user.full_name = acc["full_name"]
+                existing_user.email = acc["email"]
+                if not verify_password(acc["password"], existing_user.hashed_password):
                     existing_user.hashed_password = hash_password(acc["password"])
                     updated_count += 1
 

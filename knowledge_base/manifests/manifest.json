@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "last_updated": "2026-10-21T19:35:16.581971",
+  "last_updated": "2026-11-14T06:53:27.046239",
   "total_documents": 10,
   "total_chunks": 1012,
   "documents": {
@@ -8,7 +8,7 @@
       "doc_id": "doc-anti-money-laundering-guide",
       "document_title": "Standard Operating Procedure: Anti-Money Laundering & Rapid Liquidation (AML-04)",
       "category": "aml_kyc",
-      "source_type": "official_regulation",
+      "source_type": "sample_internal_policy",
       "file_type": "MD",
       "file_name": "anti_money_laundering_guide.md",
       "file_path": "C:\\Users\\mahes\\Documents\\FinGuard-Autonomous-Financial-Risk-Intelligence\\knowledge_base\\aml_kyc\\anti_money_laundering_guide.md",
@@ -141,7 +141,7 @@
       "doc_id": "doc-rbi-kyc-aml-master-direction",
       "document_title": "Regulatory Direction: KYC & AML Standards (RBI & International Baselines)",
       "category": "regulations",
-      "source_type": "official_regulation",
+      "source_type": "sample_internal_policy",
       "file_type": "MD",
       "file_name": "rbi_kyc_aml_master_direction.md",
       "file_path": "C:\\Users\\mahes\\Documents\\FinGuard-Autonomous-Financial-Risk-Intelligence\\knowledge_base\\regulations\\rbi_kyc_aml_master_direction.md",
@@ -201,7 +201,7 @@
       "document_access_scope": "ALL",
       "author": null,
       "error_message": "PDF file not found: ./non_existent_file.pdf",
-      "ingested_at": "2026-10-21T19:35:16.581408"
+      "ingested_at": "2026-11-14T06:53:27.045779"
     }
   }
 }

@@ -339,12 +339,16 @@ export const SystemAdmin: React.FC<SystemAdminProps> = ({ currentUser }) => {
                           <td className="px-4 py-3">
                             <span
                               className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase ${
-                                isAdminRole
+                                u.role.toLowerCase() === 'administrator' || u.role.toLowerCase() === 'admin'
                                   ? 'bg-purple-950/80 text-purple-300 border border-purple-800'
+                                  : u.role.toLowerCase() === 'investigator'
+                                  ? 'bg-amber-950/80 text-amber-300 border border-amber-800'
+                                  : u.role.toLowerCase() === 'auditor'
+                                  ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800'
                                   : 'bg-sky-950/80 text-sky-300 border border-sky-800'
                               }`}
                             >
-                              {isAdminRole ? 'ADMIN' : 'USER'}
+                              {u.role.toUpperCase()}
                             </span>
                           </td>
 

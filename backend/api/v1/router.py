@@ -10,7 +10,8 @@ from backend.api.v1.endpoints import (
     observability,
     dashboard,
     assistant,
-    mcp_routes
+    mcp_routes,
+    agents
 )
 
 api_router = APIRouter()
@@ -20,6 +21,7 @@ api_router.include_router(dashboard.router)
 api_router.include_router(transactions.router)
 api_router.include_router(risk.router)
 api_router.include_router(investigations.router)
+api_router.include_router(agents.router)
 api_router.include_router(models.router)
 api_router.include_router(knowledge.router)
 api_router.include_router(audit.router)

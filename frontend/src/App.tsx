@@ -4,6 +4,7 @@ import { Header } from './components/layout/Header';
 import { LoginPage } from './features/auth/LoginPage';
 import { ExecutiveDashboard } from './features/dashboard/ExecutiveDashboard';
 import { TransactionIntelligence } from './features/transactions/TransactionIntelligence';
+import { AgentWorkflow } from './features/agents/AgentWorkflow';
 import { InvestigationWorkbench } from './features/investigations/InvestigationWorkbench';
 import { AIRiskAssistant, clearAssistantSessionCache } from './features/assistant/AIRiskAssistant';
 import { ModelIntelligence } from './features/models/ModelIntelligence';
@@ -27,6 +28,44 @@ export function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState<boolean>(false);
   const [workbenchTxId, setWorkbenchTxId] = useState<number | null>(null);
+  const [workflowTxId, setWorkflowTxId] = useState<number | null>(null);
+  const [openCasesCount, setOpenCasesCount] = useState<number>(23);
+  const [isWakingUpBackend, setIsWakingUpBackend] = useState<boolean>(false);
+
+  // Global listeners for 401 token expiry and Render cold-start detection
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      setAuthToken(null);
+      setUser(null);
+      setIsAuthenticated(false);
+    };
+
+    const handleColdStart = (e: any) => {
+      if (e?.detail?.waking !== undefined) {
+        setIsWakingUpBackend(Boolean(e.detail.waking));
+      }
+    };
+
+    window.addEventListener('finguard_auth_expired', handleAuthExpired);
+    window.addEventListener('finguard_cold_start', handleColdStart);
+    return () => {
+      window.removeEventListener('finguard_auth_expired', handleAuthExpired);
+      window.removeEventListener('finguard_cold_start', handleColdStart);
+    };
+  }, []);
+
+  // Sync open case badge with backend summary
+  useEffect(() => {
+    if (isAuthenticated) {
+      api.getDashboardSummary()
+        .then((data) => {
+          if (data && typeof data.open_investigation_cases === 'number') {
+            setOpenCasesCount(data.open_investigation_cases);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isAuthenticated, currentTab]);
 
   // Check existing session token on application mount
   useEffect(() => {
@@ -121,7 +160,7 @@ export function App() {
           setMobileSidebarOpen(false);
         }}
         userRole={userRole}
-        openCasesCount={25}
+        openCasesCount={openCasesCount}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         mobileOpen={mobileSidebarOpen}
@@ -130,6 +169,14 @@ export function App() {
 
       {/* Main Content Viewport */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
+        {/* Render Backend Cold-Start Notification Banner */}
+        {isWakingUpBackend && (
+          <div className="bg-amber-950/80 border-b border-amber-600/40 px-4 py-1.5 text-xs text-amber-200 flex items-center justify-center gap-2 font-medium z-50 shrink-0 backdrop-blur-md">
+            <span className="h-2 w-2 rounded-full bg-amber-400 animate-ping" />
+            <span>Waking up the backend service on Render... Please wait a few seconds.</span>
+          </div>
+        )}
+
         {/* Global Authenticated TopBar */}
         <Header
           currentTab={currentTab}
@@ -151,8 +198,25 @@ export function App() {
               <ExecutiveDashboard onNavigateToTab={setCurrentTab} userRole={userRole} />
             )}
 
+            {currentTab === 'agents' && (
+              <AgentWorkflow
+                initialTxId={workflowTxId}
+                onOpenCase={(caseId) => {
+                  setWorkbenchTxId(null);
+                  setCurrentTab('investigations');
+                }}
+              />
+            )}
+
             {currentTab === 'transactions' && (
-              <TransactionIntelligence onOpenCase={handleOpenCaseFromTx} />
+              <TransactionIntelligence
+                userRole={userRole}
+                onOpenCase={handleOpenCaseFromTx}
+                onRunAgents={(txId) => {
+                  setWorkflowTxId(txId);
+                  setCurrentTab('agents');
+                }}
+              />
             )}
 
             {currentTab === 'investigations' && (

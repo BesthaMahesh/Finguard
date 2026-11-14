@@ -161,3 +161,54 @@ def submit_investigation_review(
     db.refresh(case)
 
     return InvestigationCaseResponse.model_validate(case)
+
+@router.get("/{case_id}/agent-trace")
+def get_investigation_case_agent_trace(
+    case_id: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Retrieves the stored multi-agent trace events for an investigation case.
+    Enables instant replay of historical LangGraph orchestration decisions.
+    """
+    from backend.db.models import AgentRun
+    
+    # Check agent_runs table first
+    run = db.query(AgentRun).filter(
+        (AgentRun.case_id == case_id) | 
+        (AgentRun.case_id == f"CASE-FG-{case_id}")
+    ).order_by(AgentRun.created_at.desc()).first()
+
+    if run and run.events_json:
+        return {
+            "source": "agent_runs",
+            "run_id": run.run_id,
+            "case_id": run.case_id,
+            "events": json.loads(run.events_json),
+            "risk_score": run.risk_score,
+            "risk_tier": run.risk_tier,
+            "decision": run.decision,
+            "narrative": run.narrative
+        }
+
+    # Fallback to case docket
+    case = db.query(InvestigationCase).filter(
+        (InvestigationCase.case_number == case_id) | 
+        (InvestigationCase.id == case_id)
+    ).first()
+
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Investigation case '{case_id}' not found.")
+
+    timeline = json.loads(case.agent_workflow_trace_json or "[]")
+    return {
+        "source": "case_docket",
+        "run_id": f"RUN-HISTORIC-{case.case_number}",
+        "case_id": case.case_number,
+        "timeline": timeline,
+        "summary": case.summary,
+        "risk_score": case.risk_score,
+        "priority": case.priority
+    }
+

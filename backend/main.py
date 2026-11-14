@@ -99,10 +99,7 @@ async def observability_middleware(request: Request, call_next):
             attributes={"error": str(e), "path": request.url.path},
             status="ERROR"
         )
-        return JSONResponse(
-            status_code=500,
-            content={"error": "An internal server error occurred.", "status": "INTERNAL_ERROR"}
-        )
+        raise
 
 # Root & Health Checks for Cloud Deployment (Render / Vercel / Railway)
 @app.get("/", tags=["Health & System"])

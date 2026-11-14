@@ -200,6 +200,12 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Right: Actual Health Indicator & User Profile Menu */}
       <div className="flex items-center gap-3">
+        {/* Compliance / Legal Notice */}
+        <div className="hidden xl:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-900/60 border border-slate-800 text-[10px] text-slate-400">
+          <span className="text-amber-400 font-medium">Notice:</span>
+          <span>Decision-support tool, not financial advice</span>
+        </div>
+
         {onRefresh && (
           <button
             onClick={onRefresh}

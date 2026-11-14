@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Lock,
   X,
+  Sparkles,
 } from 'lucide-react';
 import { UserRole } from '../../types';
 
@@ -61,6 +62,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       group: 'Financial Operations',
       items: [
+        { id: 'agents', label: 'Agent Workflow', icon: Sparkles },
         { id: 'transactions', label: 'Transactions', icon: Search },
         { id: 'investigations', label: 'Investigations', icon: Briefcase, badge: openCasesCount },
         { id: 'models', label: 'Detection Performance', icon: Cpu },
@@ -98,6 +100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       group: 'Operations',
       items: [
         { id: 'overview', label: 'Risk Dashboard', icon: LayoutDashboard },
+        { id: 'agents', label: 'Agent Workflow', icon: Sparkles },
         { id: 'transactions', label: 'Transactions', icon: Search },
         { id: 'investigations', label: 'Case Investigations', icon: Briefcase, badge: openCasesCount },
       ],

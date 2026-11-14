@@ -36,12 +36,13 @@ def infer_category_and_source_type(file_path: str, base_dir: str = "knowledge_ba
     filename = os.path.basename(file_path).lower()
 
     # Check immediate parent folder
+    is_pdf = filename.endswith(".pdf")
     if len(parts) > 1:
         parent = parts[0]
         if "regulation" in parent:
-            return "regulations", "official_regulation"
+            return "regulations", "official_regulation" if is_pdf else "sample_internal_policy"
         elif "aml" in parent or "kyc" in parent:
-            return "aml_kyc", "official_regulation"
+            return "aml_kyc", "official_regulation" if is_pdf else "sample_internal_policy"
         elif "fraud" in parent:
             return "fraud_patterns", "sample_internal_policy"
         elif "internal" in parent or "policy" in parent:
@@ -53,9 +54,9 @@ def infer_category_and_source_type(file_path: str, base_dir: str = "knowledge_ba
 
     # Semantic filename heuristics for root or un-categorized files
     if any(k in filename for k in ["fatf", "fatt", "rbi", "fincen", "statute", "act", "circular", "master"]):
-        return "regulations", "official_regulation"
+        return "regulations", "official_regulation" if is_pdf else "sample_internal_policy"
     elif any(k in filename for k in ["kyc", "aml", "cdd", "edd", "due_diligence"]):
-        return "aml_kyc", "official_regulation"
+        return "aml_kyc", "official_regulation" if is_pdf else "sample_internal_policy"
     elif any(k in filename for k in ["fraud", "typology", "mule", "ato", "liquidation"]):
         return "fraud_patterns", "sample_internal_policy"
     elif any(k in filename for k in ["ftfe", "paper", "study", "ownership"]):

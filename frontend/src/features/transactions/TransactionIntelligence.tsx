@@ -22,6 +22,8 @@ import {
   DollarSign,
   User,
   Building,
+  PlusCircle,
+  Zap,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { Transaction, FeatureContribution, RuleViolation } from '../../types';
@@ -31,9 +33,12 @@ import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
 import { EmptyState } from '../../components/common/EmptyState';
 import { ErrorBoundary } from '../../components/common/ErrorBoundary';
 import { Modal } from '../../components/common/Modal';
+import { AddTransactionModal } from './AddTransactionModal';
 
 interface TransactionIntelligenceProps {
   onOpenCase: (txId: number) => void;
+  onRunAgents?: (txId: number) => void;
+  userRole?: string;
 }
 
 const formatCurrency = (val: number | null | undefined): string => {
@@ -91,13 +96,21 @@ const parseRuleFlags = (flags: any): RuleViolation[] => {
   return [];
 };
 
-export const TransactionIntelligence: React.FC<TransactionIntelligenceProps> = ({ onOpenCase }) => {
+export const TransactionIntelligence: React.FC<TransactionIntelligenceProps> = ({
+  onOpenCase,
+  onRunAgents,
+  userRole = 'USER',
+}) => {
+  const normRole = (userRole || 'USER').toUpperCase();
+  const showGroundTruth = normRole === 'ADMIN' || normRole === 'ADMINISTRATOR' || normRole === 'AUDITOR';
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [selectedTx, setSelectedTx] = useState<(Transaction & { rule_flags?: RuleViolation[]; feature_contributions?: FeatureContribution[]; audit_history?: any[] }) | null>(null);
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [drawerError, setDrawerError] = useState<string | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   // Filter & Pagination States
   const [search, setSearch] = useState('');
@@ -174,13 +187,23 @@ export const TransactionIntelligence: React.FC<TransactionIntelligenceProps> = (
           subtitle="Audit, search, and analyze financial transaction flows with calibrated risk assessments"
           breadcrumbs={['FinGuard', 'Operations', 'Transactions']}
           actions={
-            <button
-              onClick={fetchTransactions}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition cursor-pointer"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-              Refresh
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs font-mono shadow-md shadow-cyan-950/50 transition cursor-pointer"
+              >
+                <PlusCircle className="h-3.5 w-3.5 stroke-[2.5]" />
+                <span>+ Add Transaction</span>
+              </button>
+              <button
+                onClick={fetchTransactions}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition cursor-pointer"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                Refresh
+              </button>
+            </div>
           }
         />
 
@@ -294,7 +317,7 @@ export const TransactionIntelligence: React.FC<TransactionIntelligenceProps> = (
                     <th className="px-4 py-3">Destination</th>
                     <th className="px-4 py-3">Model Prob.</th>
                     <th className="px-4 py-3">Risk Tier</th>
-                    <th className="px-4 py-3">Ground Truth</th>
+                    <th className="px-4 py-3">{showGroundTruth ? 'Dataset Label (Eval)' : 'Review Status'}</th>
                     <th className="px-4 py-3 text-right">Action</th>
                   </tr>
                 </thead>
@@ -327,12 +350,20 @@ export const TransactionIntelligence: React.FC<TransactionIntelligenceProps> = (
                         <RiskBadge level={tx.risk_level || 'LOW'} size="sm" />
                       </td>
                       <td className="px-4 py-3 font-sans">
-                        {tx.is_fraud === 1 ? (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-950/80 text-rose-300 border border-rose-800 font-mono">
-                            FRAUD
-                          </span>
+                        {showGroundTruth ? (
+                          tx.is_fraud === 1 ? (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-950/80 text-rose-300 border border-rose-800 font-mono" title="Dataset label (evaluation only)">
+                              FRAUD (Eval)
+                            </span>
+                          ) : tx.is_fraud === 0 ? (
+                            <span className="text-[10px] text-slate-500 font-mono">Normal (Eval)</span>
+                          ) : (
+                            <span className="text-[10px] text-slate-500 font-mono italic">Unlabeled</span>
+                          )
                         ) : (
-                          <span className="text-[10px] text-slate-500 font-mono">Normal</span>
+                          <span className="text-[10px] text-slate-400 font-mono capitalize">
+                            {(tx.status || 'UNREVIEWED').toLowerCase().replace('_', ' ')}
+                          </span>
                         )}
                       </td>
                       <td className="px-4 py-3 text-right font-sans">
@@ -494,28 +525,48 @@ export const TransactionIntelligence: React.FC<TransactionIntelligenceProps> = (
                   </p>
                 </div>
 
-                {/* Dataset Ground Truth */}
-                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2.5">
-                  <span className="text-xs font-semibold text-amber-300 font-mono uppercase tracking-wider">
-                    Historical Dataset Ground Truth
-                  </span>
-                  <div className="pt-1">
-                    {selectedTx.is_fraud === 1 ? (
-                      <div className="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-200 text-xs font-bold font-mono flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0" />
-                        <span>CONFIRMED FRAUD (Dataset Label)</span>
-                      </div>
-                    ) : (
-                      <div className="p-2.5 rounded-lg bg-emerald-950/50 border border-emerald-800 text-emerald-200 text-xs font-bold font-mono flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-                        <span>NORMAL TRANSACTION</span>
-                      </div>
-                    )}
+                {/* Dataset Ground Truth / Status */}
+                {showGroundTruth ? (
+                  <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2.5">
+                    <span className="text-xs font-semibold text-amber-300 font-mono uppercase tracking-wider">
+                      Dataset Label (Evaluation Only)
+                    </span>
+                    <div className="pt-1">
+                      {selectedTx.is_fraud === 1 ? (
+                        <div className="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800 text-rose-200 text-xs font-bold font-mono flex items-center gap-2">
+                          <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0" />
+                          <span>CONFIRMED FRAUD (Dataset label: evaluation only)</span>
+                        </div>
+                      ) : selectedTx.is_fraud === 0 ? (
+                        <div className="p-2.5 rounded-lg bg-emerald-950/50 border border-emerald-800 text-emerald-200 text-xs font-bold font-mono flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                          <span>NORMAL TRANSACTION (Dataset label: evaluation only)</span>
+                        </div>
+                      ) : (
+                        <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 text-xs font-mono">
+                          Unlabeled live transaction (Ground truth unknown)
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-tight pt-1">
+                      Historical benchmark settlement label visible to Administrators & Auditors only.
+                    </p>
                   </div>
-                  <p className="text-[10px] text-slate-500 leading-tight pt-1">
-                    Historical benchmark settlement label. Isolated from model scoring features to prevent target leakage.
-                  </p>
-                </div>
+                ) : (
+                  <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2.5">
+                    <span className="text-xs font-semibold text-sky-300 font-mono uppercase tracking-wider">
+                      Investigative Settlement Status
+                    </span>
+                    <div className="pt-1">
+                      <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 text-xs font-mono capitalize">
+                        Status: {(selectedTx.status || 'UNREVIEWED').toLowerCase().replace('_', ' ')}
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-slate-500 leading-tight pt-1">
+                      Current workflow stage in the multi-agent detection pipeline.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Associated Investigation Case */}
@@ -686,9 +737,67 @@ export const TransactionIntelligence: React.FC<TransactionIntelligenceProps> = (
                   </div>
                 );
               })()}
+
+              {/* Slide-over Action Toolbar */}
+              <div className="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                <div className="text-[11px] font-mono text-slate-500">
+                  Transaction #{selectedTx.id}
+                </div>
+                <div className="flex items-center gap-2">
+                  {onRunAgents && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const id = selectedTx.id;
+                        setSelectedTx(null);
+                        onRunAgents(id);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white font-mono text-xs font-semibold shadow transition cursor-pointer"
+                    >
+                      <Zap className="h-3.5 w-3.5 text-amber-300" />
+                      <span>Run Agent Workflow</span>
+                    </button>
+                  )}
+                  {selectedTx.investigation && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onOpenCase(selectedTx.id);
+                        setSelectedTx(null);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-950 hover:bg-sky-900 border border-sky-700/60 text-sky-300 font-mono text-xs transition cursor-pointer"
+                    >
+                      <span>Open Case Docket</span>
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </Modal>
         )}
+
+        {/* Add Transaction Modal */}
+        <AddTransactionModal
+          isOpen={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          userRole={userRole}
+          onSuccess={(newTx) => {
+            if (newTx) {
+              setTransactions((prev) => [newTx, ...prev]);
+              setTotal((prev) => prev + 1);
+            } else {
+              fetchTransactions();
+            }
+          }}
+          onSuccessAndRun={(newTx) => {
+            if (newTx) {
+              setTransactions((prev) => [newTx, ...prev]);
+              setTotal((prev) => prev + 1);
+              if (onRunAgents) onRunAgents(newTx.id);
+            }
+          }}
+        />
       </div>
     </ErrorBoundary>
   );

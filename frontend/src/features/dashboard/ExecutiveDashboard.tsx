@@ -34,6 +34,8 @@ import {
   User,
   Shield,
   FileText,
+  PlusCircle,
+  Zap,
 } from 'lucide-react';
 import { api } from '../../services/api';
 import { DashboardSummary, AuditEvent, Transaction, UserRole } from '../../types';
@@ -42,6 +44,7 @@ import { MetricCard } from '../../components/common/MetricCard';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
 import { ErrorState } from '../../components/common/ErrorState';
 import { RiskBadge } from '../../components/common/RiskBadge';
+import { AddTransactionModal } from '../transactions/AddTransactionModal';
 
 interface ExecutiveDashboardProps {
   onNavigateToTab: (tab: string) => void;
@@ -63,6 +66,7 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ onNaviga
   // Role-Specific Datasets
   const [recentAudits, setRecentAudits] = useState<AuditEvent[]>([]);
   const [priorityTransactions, setPriorityTransactions] = useState<Transaction[]>([]);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const normRole = (userRole || 'USER').toUpperCase();
   const isAdmin = normRole === 'ADMIN' || normRole === 'ADMINISTRATOR';
@@ -243,7 +247,23 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ onNaviga
       {!isAdmin && (
         <div className="space-y-6">
           {/* Analyst Quick Actions */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="p-3.5 rounded-xl bg-gradient-to-br from-cyan-950/60 to-slate-900 border border-cyan-700/60 hover:border-cyan-400 text-left transition space-y-1.5 group cursor-pointer shadow-md"
+            >
+              <div className="flex items-center justify-between">
+                <div className="p-2 rounded-lg bg-cyan-500/20 text-cyan-400 group-hover:bg-cyan-500/30 transition">
+                  <PlusCircle className="h-4 w-4" />
+                </div>
+                <ArrowRight className="h-3.5 w-3.5 text-slate-500 group-hover:text-cyan-400 transition" />
+              </div>
+              <div className="text-xs font-bold text-white">+ Add Transaction</div>
+              <div className="text-[11px] text-slate-400">
+                Submit new ledger entry & run real-time agents
+              </div>
+            </button>
+
             <button
               onClick={() => onNavigateToTab('transactions')}
               className="p-3.5 rounded-xl bg-[#11192e] border border-slate-800 hover:border-sky-500/40 text-left transition space-y-1.5 group cursor-pointer"
@@ -645,6 +665,20 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ onNaviga
           </div>
         </div>
       )}
+
+      {/* Quick Add Transaction Modal */}
+      <AddTransactionModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        userRole={userRole}
+        onSuccess={() => {
+          loadDashboardData();
+        }}
+        onSuccessAndRun={() => {
+          loadDashboardData();
+          onNavigateToTab('agents');
+        }}
+      />
     </div>
   );
 };

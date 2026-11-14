@@ -268,16 +268,48 @@ def chat_with_risk_assistant(
                 "latency_ms": elapsed_ms
             }
 
-    # 3. Standard Policy-Grounded RAG Retrieval with PII Redaction
+    # 3. Standard Policy-Grounded RAG Retrieval with PII Redaction & Relevance Threshold
     safe_query = pii_protector.redact_pii(message)
     citations = PolicyRetriever.search_policies(
         query=safe_query,
         top_k=3,
+        min_relevance_score=0.45,
         user_role=current_user["role"]
     )
 
+    # Strict insufficient evidence check: withhold answer if nothing relevant is indexed
+    if not citations or max((c.get("relevance_score", 0.0) for c in citations), default=0.0) < 0.45:
+        reply_refusal = (
+            "### Insufficient Policy Evidence\n\n"
+            "I cannot answer this question from the indexed policies and regulations. "
+            "The query is not supported by current indexed compliance documentation. "
+            "Please consult the compliance or legal team directly for authoritative guidance."
+        )
+        elapsed_ms = round((time.time() - t0) * 1000.0, 2)
+        u_msg = ConversationMessage(conversation_id=conv.id, sender="user", text=message)
+        a_msg = ConversationMessage(
+            conversation_id=conv.id,
+            sender="assistant",
+            text=reply_refusal,
+            citations_json="[]",
+            tokens_used=0,
+            latency_ms=elapsed_ms
+        )
+        db.add_all([u_msg, a_msg])
+        db.commit()
+        return {
+            "reply": reply_refusal,
+            "citations": [],
+            "conversation_id": conv.id,
+            "status": "INSUFFICIENT_EVIDENCE",
+            "latency_ms": elapsed_ms
+        }
+
     sandboxed_context = [
-        PromptGuard.wrap_untrusted_context(c["excerpt"], source_label=f"{c['document_id']} ({c['section']}, v{c.get('version', '1.0')})")
+        PromptGuard.wrap_untrusted_context(
+            c["excerpt"],
+            source_label=f"{c.get('document_id', 'POLICY')} ({c.get('document_title', 'Policy')}, Section: {c.get('section', 'General')}, Page: {c.get('page_number', 1)})"
+        )
         for c in citations
     ]
     context_str = "\n\n".join(sandboxed_context)
@@ -286,44 +318,38 @@ def chat_with_risk_assistant(
     system_prompt = (
         "You are FinGuard AI Risk Assistant, an enterprise copilot for financial crime analysts and investigators.\n"
         "Guidelines:\n"
-        "1. Strictly ground your response in the provided compliance and policy guidelines.\n"
+        "1. Strictly ground your response ONLY in the provided compliance and policy guidelines. Never speculate or hallucinate outside the text.\n"
         "2. Format your response cleanly in GitHub-flavored Markdown using section headings (###), bullet points (- ), and bold highlights (**).\n"
         "3. If the policy context does not contain the answer, explicitly state that verified policy guidance is unavailable.\n"
-        "4. Cite policy documents (e.g., AML-04, POL-FRAUD-2024-01, RBI KYC Guidelines, v1.0) where applicable.\n"
+        "4. Always cite specific document IDs, sections, and page references (e.g., AML-04, FATF Rec. 16, Section 2.1, Page 14) in your answer.\n"
         "5. Never state that an individual or transaction is a definitively proven crime. Maintain neutral, objective risk terminology."
     )
 
     user_prompt = (
         f"User Query: {safe_query}\n\n"
-        f"Retrieved Policy Evidence:\n{context_str or 'No direct policy matching this specific query found in index.'}\n\n"
-        f"Provide a structured, authoritative answer for the risk analyst:"
+        f"Retrieved Policy Evidence:\n{context_str}\n\n"
+        f"Provide a structured, authoritative answer for the risk analyst with precise citations:"
     )
 
     llm_resp = llm_client.generate_completion(system_prompt=system_prompt, user_prompt=user_prompt, max_tokens=600)
     reply_text = llm_resp.get("content", "").strip()
 
     if not reply_text:
-        if citations:
-            top_c = citations[0]
-            sec = top_c.get("section", "Standard Compliance Guidance")
-            doc = top_c.get("document_id", "POLICY")
-            ver = top_c.get("version", "1.0")
-            src = top_c.get("source_file", "Official Manual")
-            full_text = top_c.get("full_text", top_c.get("excerpt", "")).strip()
+        top_c = citations[0]
+        sec = top_c.get("section", "Compliance Policy Guidance")
+        doc = top_c.get("document_id", "POLICY")
+        title = top_c.get("document_title", "Operational Policy")
+        ver = top_c.get("version", "1.0")
+        page = top_c.get("page_number", 1)
+        excerpt = top_c.get("excerpt", "").strip()
 
-            lines = [
-                f"### Grounded Compliance Guidance: {sec}\n",
-                f"**Governing Policy:** `{doc}` (Version {ver}, `{src}`)\n",
-                f"{full_text}\n\n",
-                f"> **Operational Principle:** Model-generated risk scores serve strictly as non-autonomous decision support alerts. Final disposition requires review and sign-off by an authorized human investigator."
-            ]
-            reply_text = "\n".join(lines)
-        else:
-            reply_text = (
-                "### Insufficient Policy Evidence\n\n"
-                "No indexed compliance procedure directly covers this specific query. "
-                "Please consult the Financial Crimes Intelligence Manual or file an inquiry with the Chief Risk Office."
-            )
+        lines = [
+            f"### Grounded Compliance Finding: {sec}\n",
+            f"**Governing Document:** `{doc}` — *{title}* (v{ver}, Section `{sec}`, Page {page})\n\n",
+            f"{excerpt}\n\n",
+            f"> **Compliance Mandate:** Model-generated risk indicators serve strictly as non-autonomous decision support alerts. Final disposition requires review and sign-off by an authorized human investigator (Four-Eyes Principle)."
+        ]
+        reply_text = "\n".join(lines)
 
     elapsed_ms = round((time.time() - t0) * 1000.0, 2)
     tokens = llm_resp.get("tokens_used", 0)

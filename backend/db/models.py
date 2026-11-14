@@ -36,7 +36,7 @@ class Transaction(Base):
     name_dest = Column(String(40), nullable=False, index=True)
     old_balance_dest = Column(Float, nullable=False)
     new_balance_dest = Column(Float, nullable=False)
-    is_fraud = Column(Integer, default=0, nullable=False)  # Ground-truth dataset label
+    is_fraud = Column(Integer, nullable=True, default=None)  # Ground-truth dataset label (None for user-submitted)
     is_flagged_fraud = Column(Integer, default=0, nullable=False)
     
     # Model & Risk inference fields (dynamically evaluated or persisted)
@@ -162,4 +162,21 @@ class ConversationMessage(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     conversation = relationship("Conversation", back_populates="messages")
+
+class AgentRun(Base):
+    __tablename__ = "agent_runs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    run_id = Column(String(64), unique=True, nullable=False, index=True)
+    transaction_id = Column(Integer, ForeignKey("transactions.id"), nullable=True, index=True)
+    case_id = Column(String(36), ForeignKey("investigation_cases.id"), nullable=True, index=True)
+    user = Column(String(50), nullable=False)
+    risk_score = Column(Float, nullable=True)
+    risk_tier = Column(String(20), nullable=True)
+    decision = Column(String(50), nullable=True)
+    narrative = Column(Text, nullable=True)
+    events_json = Column(Text, nullable=False)
+    duration_ms = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=utc_now, index=True)
+
 
