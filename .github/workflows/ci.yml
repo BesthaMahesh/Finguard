@@ -26,11 +26,16 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-asyncio httpx
 
+      - name: Pre-index Knowledge Base
+        run: |
+          python scripts/ingest_knowledge.py --reindex-all
+
       - name: Run Pytest Suite
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           SECRET_KEY: finguard-enterprise-autonomous-risk-intelligence-secure-jwt-key
           ENVIRONMENT: test
+          PYTHONPATH: .
         run: |
           pytest backend/tests/ -v
 
