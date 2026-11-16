@@ -40,9 +40,13 @@ export const Header: React.FC<HeaderProps> = ({
 
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
-  // Close profile dropdown when switching navigation tabs
+  // Close profile dropdown and update document title when switching navigation tabs
   useEffect(() => {
     setShowProfileMenu(false);
+    const tabInfo = titles[currentTab];
+    if (tabInfo) {
+      document.title = `FinGuard — ${tabInfo.title}`;
+    }
   }, [currentTab]);
 
   // Close profile dropdown on outside click or Escape key
@@ -96,6 +100,11 @@ export const Header: React.FC<HeaderProps> = ({
       category: 'Operations',
       title: 'Risk Dashboard',
       subtitle: 'Portfolio fraud metrics, risk distribution, and high-priority anomalies',
+    },
+    agents: {
+      category: 'Operations',
+      title: 'Risk Analysis Workflow',
+      subtitle: 'Real-time multi-agent financial risk evaluation and automated compliance triage',
     },
     transactions: {
       category: 'Operations',

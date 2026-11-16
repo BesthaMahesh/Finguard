@@ -33,52 +33,52 @@ export const DEFAULT_AGENTS: Array<{ id: string; label: string; role: string }> 
   {
     id: 'supervisor_plan',
     label: 'Supervisor Agent',
-    role: 'Orchestrator: Evaluates intent, assigns correlation ID, and dynamically routes workflow.',
+    role: 'Workflow Orchestration: Initializes investigation context, assigns audit session ID, and dynamically routes triage path.',
   },
   {
     id: 'intake',
     label: 'Transaction Intake Agent',
-    role: 'Validator: Validates payload schema, formats decimals, and unpacks account numbers.',
+    role: 'Ingestion & Normalization: Validates transaction schema, standardizes currency precision, and verifies counterparty identifiers.',
   },
   {
     id: 'data_quality',
     label: 'Data Quality Agent',
-    role: 'LeakageGuard: Checks balance signs and ensures zero target label leakage.',
+    role: 'Ledger Reconciliation & Integrity: Verifies double-entry ledger math, detects balance anomalies, and ensures data integrity.',
   },
   {
     id: 'fraud_detector',
     label: 'Fraud Detection Agent',
-    role: 'ML Classifier: Runs Random Forest inference and evaluates deterministic fraud rules.',
+    role: 'Predictive Fraud Analytics: Evaluates machine learning fraud probabilities and triggers statutory rule screening.',
   },
   {
     id: 'market_credit_risk',
     label: 'Market & Credit Risk Agent',
-    role: 'Risk Quant: Evaluates portfolio volatility, exposure ratio, and parametric 95% VaR.',
+    role: 'Exposure & Liquidity Analytics: Assesses counterparty exposure limits, portfolio concentration, and 95% Value-at-Risk.',
   },
   {
     id: 'risk_assessment',
     label: 'Risk Assessment Agent',
-    role: 'Score Synthesizer: Blends ML probabilities and rule penalties into a 0-100 composite risk score.',
+    role: 'Composite Risk Scoring: Synthesizes predictive probabilities, exposure metrics, and statutory penalties into a calibrated 0–100 risk score.',
   },
   {
     id: 'investigator',
     label: 'Investigation Agent',
-    role: 'Forensic Analyst: Examines rapid balance liquidation deltas and counterparty relationship graphs.',
+    role: 'Forensic Pattern Analysis: Investigates rapid account liquidation, transaction velocity, and counterparty relationship graphs.',
   },
   {
     id: 'policy_compliance',
     label: 'Policy & Compliance Agent',
-    role: 'Regulatory RAG: Queries vector store to pull statutory citations (FATF Rec 16, AML-04).',
+    role: 'Statutory & Regulatory Compliance: Cross-references regulatory frameworks (FATF Recommendation 16, AML-04, KYC) and binds citations.',
   },
   {
     id: 'explainability',
     label: 'Explainability Agent',
-    role: 'Narrative Generator: Synthesizes TreeSHAP feature attributions and policies into an objective report via Groq LLM.',
+    role: 'Explainability & Decision Support: Translates model feature attributions and policy requirements into an objective compliance narrative.',
   },
   {
     id: 'audit_reporter',
     label: 'Audit & Reporting Agent',
-    role: 'Ledger Sealer: Packages the forensic docket, masks PII, and seals a SHA-256 chained audit record.',
+    role: 'Audit & Governance Finalizer: Assembles the forensic dossier, redacts customer PII, and seals the tamper-evident SHA-256 audit record.',
   },
 ];
 

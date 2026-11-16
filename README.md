@@ -30,7 +30,7 @@ The core reasoning engine consists of 10 specialized LangGraph agents collaborat
 | :--- | :--- | :--- |
 | **1. Supervisor Agent** | Evaluates incoming transaction payload, generates correlation UUID, and determines initial graph routing strategy. | Orchestration Entry |
 | **2. Transaction Intake Agent** | Validates schema constraints, formats currency decimals, masks sensitive account IDs, and loads persisted database records. | Intake & Ledger Normalization |
-| **3. Data Quality Agent** | Enforces `LeakageGuard` checks, ensuring ground-truth target labels (`is_fraud`) are completely stripped prior to model inference. | Boundary & Quality Guard |
+| **3. Data Quality Agent** | Enforces `LeakageGuard` checks (stripping `is_fraud`) and performs deterministic ledger reconciliation (flags minor/major balance variance & impossible merchant balances). | Boundary, Reconciliation & Quality Guard |
 | **4. Fraud Detection Agent** | Executes trained Random Forest model, computes fraud probability, and triggers deterministic rule flags. | ML Classifier & Rule Engine |
 | **5. Market & Credit Risk Agent** | Analyzes counterparty exposure, Value-at-Risk (VaR), portfolio concentration ratio, and assigns synthetic credit risk ratings. | Quantitative Risk Analytics |
 | **6. Risk Assessment Agent** | Synthesizes ML probabilities, market risk, and rule penalties into a 0–100 composite risk score; evaluates dynamic fast-track threshold (`score < 30`). | Dynamic Conditional Router |
@@ -91,18 +91,29 @@ FinGuard implements strict, server-side role enforcement on every API route via 
 - **Server-Sent Events (SSE)**: Streams events from `POST /api/v1/agents/analyze/stream` using `astream_events("v2")`.
 - **Horizontal Pipeline Strip**: Real-time status badges for all 10 agents (*Waiting, Running Pulsing, Completed, Skipped via Fast-Track*).
 - **Live LLM Token Typewriter**: Streams explanation narrative tokens in real time from Groq (`llama-3.3-70b-versatile`).
+- **Post-Generation Validator**: LLM prompts receive structured facts only. Validator verifies all flagged issues are mentioned, numbers exist in facts, and rejects mitigating words (`neutralized`, `mitigated`, `outweighed`); falls back to deterministic template if violated.
+- **Database Lookup & What-If Simulation**: DB transactions load locked read-only. Clicking *"Edit as what-if simulation"* enables parameter tweaking without mutating DB records or spawning unwanted cases.
 - **Orchestrator Verdict Card**: Displays final composite risk score, operational tier, policy citations, and deep-link to create/open investigation dockets.
 - **Trace Replay**: Full historical agent runs stored in SQLite `agent_runs` table, replayed on-demand in both the Agent Workflow and Investigation Workbench.
 
 ### 2. Transaction Ingestion & Modal (`+ Add Transaction`)
 - Primary button on Transactions table header and quick-action on Risk Dashboard.
-- Strict ledger consistency validation (impossible balances and negative amounts rejected with 422).
+- **Deterministic Ledger Reconciliation**: Live inline warning under balance inputs (e.g., origin balance delta mismatch, merchant accounts with nonzero balances) plus an *"Auto-fill balances from amount"* helper.
+- **Statutory Rule Floors**: Composite score is strictly `max(ML-based score, rule floor)`. Minor ledger variance (`> 1.0`) enforces floor 40 (MEDIUM); major variance (`> $10,000`) or impossible merchant balance enforces floor 70 (HIGH, mandatory review). The ML model or LLM can never lower a triggered rule floor.
 - Presets: *"Load Sample: Normal Payment"* and *"Load Sample: Fraud-Like Drain"*.
 - Actions: *"Save only"* and *"Save & Run Agents Live"*.
 - Auto-case creation for High / Critical risk transactions with status `OPEN` and 4-Eyes review required.
-- Bulk CSV upload with row-by-row ledger validation for Administrators.
 
-### 3. Cryptographic Audit Hash Chaining
+### 3. Investigator Workbench & Server-Enforced 4-Eyes Separation
+- **Four-Eyes Principle**: A user who submitted/created a transaction or case can **never** approve its disposition (server-enforced HTTP 403 Forbidden).
+- **Structured Evidence Review**: Disposition decision dropdown defaults unselected. Investigators must select reviewed evidence checkboxes (e.g., Rapid Liquidation, Ledger Variance) and provide &ge; 30 characters of factual notes before committing.
+- Submitter (`submitted_by`) and reviewer (`reviewed_by`) are prominently displayed in the dossier header.
+
+### 4. Canonical 12,000 Historical Dataset & Demo Reset
+- Executive Dashboard explicitly separates `"12,000 historical + N live-entered"` transactions.
+- Automated reset via `python scripts/reset_demo_data.py` or `POST /api/v1/auth/reset-demo-data` restores exactly 12,000 historical PaySim transactions, 25 baseline cases (23 OPEN, 2 CLOSED), and re-verifies the SHA-256 audit chain.
+
+### 5. Cryptographic Audit Hash Chaining
 - Every transaction creation, agent execution, user status change, and investigator disposition computes a SHA-256 hash incorporating the previous event's hash (`event_hash = SHA256(corr_id : action : target_id : prev_hash : timestamp)`).
 - **"Verify Chain Integrity"** button in Governance & Audit page verifies genesis-to-tip integrity on-demand.
 

@@ -100,18 +100,8 @@ class FinancialPIIProtector:
         )
         self.analyzer.registry.add_recognizer(iban_recognizer)
 
-        # 3. SWIFT / BIC Code (ISO 9362 8 or 11 characters with banking context)
-        swift_pattern = Pattern(
-            name="swift_bic_pattern",
-            regex=r"\b[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?\b",
-            score=0.70
-        )
-        swift_recognizer = PatternRecognizer(
-            supported_entity="SWIFT_BIC",
-            patterns=[swift_pattern],
-            context=["swift", "bic", "bank", "wire", "transfer", "clearing"]
-        )
-        self.analyzer.registry.add_recognizer(swift_recognizer)
+        # 3. SWIFT / BIC Code (Disabled generic matching to prevent false positives on normal words like TRANSACTION)
+        # self.analyzer.registry.add_recognizer(swift_recognizer)
 
         # 4. Cryptocurrency Wallet Address (BTC, ETH)
         crypto_pattern = Pattern(
@@ -155,7 +145,7 @@ class FinancialPIIProtector:
                     entities=[
                         "PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "IP_ADDRESS",
                         "CREDIT_CARD", "US_SSN", "FINANCIAL_ACCOUNT", "IBAN_CODE",
-                        "SWIFT_BIC", "CRYPTO_WALLET"
+                        "CRYPTO_WALLET"
                     ]
                 )
                 for res in analyzer_results:
@@ -196,7 +186,7 @@ class FinancialPIIProtector:
                     entities=[
                         "PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "IP_ADDRESS",
                         "CREDIT_CARD", "US_SSN", "FINANCIAL_ACCOUNT", "IBAN_CODE",
-                        "SWIFT_BIC", "CRYPTO_WALLET"
+                        "CRYPTO_WALLET"
                     ]
                 )
 
@@ -272,8 +262,11 @@ class FinancialPIIProtector:
             if allowed_fields and k in allowed_fields:
                 sanitized[k] = v
             elif isinstance(v, str):
-                if k in ("name_orig", "name_dest", "account_id"):
+                if k in ("name_orig", "name_dest", "account_id", "nameOrig", "nameDest"):
                     sanitized[k] = self.mask_financial_account(v)
+                elif k in ("narrative", "synthesis", "explanation", "explanation_summary", "excerpt", "full_text", "content", "title", "reason", "details", "text", "summary"):
+                    # Preserve narrative, explanations, and policy text without mangling
+                    sanitized[k] = v
                 else:
                     sanitized[k] = self.redact_pii(v)
             elif isinstance(v, dict):

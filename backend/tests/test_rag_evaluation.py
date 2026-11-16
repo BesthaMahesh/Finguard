@@ -65,3 +65,26 @@ def test_rag_grounded_synthesis_citations():
     assert len(resp.citations) > 0
     assert resp.synthesis is not None
     assert len(resp.synthesis) > 20
+
+def test_deduplicated_policy_retrieval():
+    """
+    Verify that policy searches for 'four-eyes principle' and 'full account liquidation'
+    return clean top citations without duplicate document representations.
+    """
+    PolicyRetriever.clear_cache()
+
+    # 1. Four-eyes principle search
+    fe_citations = PolicyRetriever.search_policies("four-eyes principle", top_k=5, min_relevance_score=0.45)
+    assert len(fe_citations) > 0
+    top_fe = fe_citations[0]
+    assert top_fe["document_id"] == "GOV-AI-2024-09"
+    doc_ids_fe = [c["document_id"] for c in fe_citations]
+    assert "doc-sample-transaction-fraud-investigation-procedure" not in doc_ids_fe
+    assert "doc-internal-risk-governance-policy" not in doc_ids_fe
+
+    # 2. Full account liquidation search
+    liq_citations = PolicyRetriever.search_policies("full account liquidation", top_k=5, min_relevance_score=0.45)
+    assert len(liq_citations) > 0
+    doc_ids_liq = [c["document_id"] for c in liq_citations]
+    assert "doc-sample-transaction-fraud-investigation-procedure" not in doc_ids_liq
+    assert "doc-anti-money-laundering-guide" not in doc_ids_liq

@@ -20,6 +20,7 @@ from backend.schemas.transaction import (
     ALLOWED_TRANSACTION_TYPES
 )
 from backend.ml.model_service import model_service
+from backend.core.decision_policy import evaluate_decision_policy, generate_next_case_number
 from backend.security.jwt_auth import get_current_user
 from backend.security.rbac import check_permission
 from backend.observability.tracer import tracer
@@ -121,6 +122,27 @@ def create_transaction(
         "newbalanceDest": tx_in.new_balance_dest
     }
 
+    # 1. Deterministic Ledger Reconciliation & Warnings
+    warnings: List[str] = []
+    t_type = tx_in.type
+    old_orig = tx_in.old_balance_org
+    new_orig = tx_in.new_balance_orig
+    old_dest = tx_in.old_balance_dest
+    new_dest = tx_in.new_balance_dest
+    amount = tx_in.amount
+    name_dest = tx_in.name_dest.strip()
+    is_merchant = name_dest.startswith("M")
+
+    orig_expected = old_orig - amount if t_type in ("TRANSFER", "CASH_OUT", "PAYMENT", "DEBIT") else old_orig + amount
+    orig_variance = round(orig_expected - new_orig, 2)
+    if abs(orig_variance) > 10000.0:
+        warnings.append(f"Major origin balance variance (${orig_variance:,.2f}) does not match transaction amount (${amount:,.2f}).")
+    elif abs(orig_variance) > 1.0:
+        warnings.append(f"Minor origin balance variance (${orig_variance:,.2f}) detected.")
+
+    if is_merchant and (old_dest > 0.0 or new_dest > 0.0):
+        warnings.append(f"Impossible merchant balance: Terminal account '{name_dest}' has nonzero balance (old: ${old_dest:,.2f}, new: ${new_dest:,.2f}).")
+
     try:
         analysis = model_service.predict_transaction(tx_dict_for_eval)
         fraud_prob = float(analysis.get("fraud_probability", 0.0))
@@ -134,7 +156,16 @@ def create_transaction(
         pred_fraud = 0
         risk_score = 10.0
         risk_level = "LOW"
+        rules_list = []
         rule_flags_str = "[]"
+
+    # Evaluate Unified Decision Policy (Single Source of Truth)
+    policy_verdict = evaluate_decision_policy(
+        risk_score=risk_score,
+        rule_flags=[r.get("rule_id", "") for r in rules_list],
+        data_quality_flags=["LEDGER_VARIANCE_MAJOR"] if abs(orig_variance) > 10000.0 else (["LEDGER_VARIANCE_MINOR"] if abs(orig_variance) > 1.0 else []),
+        transaction=tx_dict_for_eval
+    )
 
     # 2. Persist new Transaction with ground_truth = None
     new_tx = Transaction(
@@ -152,33 +183,42 @@ def create_transaction(
         predicted_fraud=pred_fraud,
         fraud_probability=fraud_prob,
         risk_score=risk_score,
-        risk_level=risk_level,
-        status="UNDER_INVESTIGATION" if risk_score >= 65.0 else "UNREVIEWED",
+        risk_level=policy_verdict.risk_tier,
+        status="UNDER_INVESTIGATION" if policy_verdict.requires_human_review else "CLEARED",
         rule_flags=rule_flags_str
     )
+    if hasattr(new_tx, "source"):
+        new_tx.source = "user_entered"
+    if hasattr(new_tx, "is_test"):
+        new_tx.is_test = False
+
     db.add(new_tx)
     db.flush()  # Populates new_tx.id
 
-    # 3. If risk >= High (>= 65.0), automatically create an open investigation case
+    # 3. Create open investigation case if required by unified decision policy
     created_case_id: Optional[str] = None
-    if risk_score >= 65.0 or risk_level in ("HIGH", "CRITICAL"):
-        case_num = f"CASE-FG-{new_tx.id:06d}"
+    if policy_verdict.case_created:
+        case_num = generate_next_case_number(db)
         new_case = InvestigationCase(
             case_number=case_num,
             transaction_id=new_tx.id,
-            title=f"Suspicious {new_tx.type} - ${new_tx.amount:,.2f} from {new_tx.name_orig}",
+            title=policy_verdict.title,
             status="OPEN",
-            priority="CRITICAL" if risk_score >= 85.0 else "HIGH",
+            priority=policy_verdict.priority,
             assigned_to="Financial Crime Unit (AI Triage)",
             risk_score=risk_score,
-            summary=(
-                f"Autonomous risk alert: Transaction #{new_tx.id} ({new_tx.type} of ${new_tx.amount:,.2f}) "
-                f"scored composite risk {risk_score:.1f}/100 ({risk_level}). Flagged for 4-Eyes Investigator review."
-            ),
+            summary=policy_verdict.summary_reason,
             model_features_json=json.dumps(analysis.get("feature_contributions", [])),
             policy_citations_json="[]",
             agent_workflow_trace_json="[]"
         )
+        if hasattr(new_case, "submitted_by"):
+            new_case.submitted_by = current_user.get("username")
+        if hasattr(new_case, "source"):
+            new_case.source = "user_entered"
+        if hasattr(new_case, "is_test"):
+            new_case.is_test = False
+
         db.add(new_case)
         created_case_id = case_num
 
@@ -208,8 +248,10 @@ def create_transaction(
             "type": new_tx.type,
             "amount": new_tx.amount,
             "risk_score": risk_score,
-            "risk_level": risk_level,
-            "case_created": created_case_id
+            "risk_level": policy_verdict.risk_tier,
+            "decision": policy_verdict.decision,
+            "case_created": created_case_id,
+            "warnings": warnings
         })
     )
     db.add(audit_ev)
@@ -218,6 +260,8 @@ def create_transaction(
 
     resp = TransactionResponse.model_validate(new_tx)
     resp.case_id = created_case_id
+    resp.decision = policy_verdict.decision
+    resp.warnings = warnings
     return resp
 
 @router.post("/upload-csv")

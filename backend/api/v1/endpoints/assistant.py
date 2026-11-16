@@ -320,15 +320,15 @@ def chat_with_risk_assistant(
         "Guidelines:\n"
         "1. Strictly ground your response ONLY in the provided compliance and policy guidelines. Never speculate or hallucinate outside the text.\n"
         "2. Format your response cleanly in GitHub-flavored Markdown using section headings (###), bullet points (- ), and bold highlights (**).\n"
-        "3. If the policy context does not contain the answer, explicitly state that verified policy guidance is unavailable.\n"
-        "4. Always cite specific document IDs, sections, and page references (e.g., AML-04, FATF Rec. 16, Section 2.1, Page 14) in your answer.\n"
+        "3. Keep your response concise (maximum ~180 words) unless the user specifically requested extensive detail.\n"
+        "4. Always cite specific document IDs, sections, and page references (e.g., [AML-04, Section 2.1], [FATF Rec. 16, Page 14]) directly in your answer for every substantive claim.\n"
         "5. Never state that an individual or transaction is a definitively proven crime. Maintain neutral, objective risk terminology."
     )
 
     user_prompt = (
         f"User Query: {safe_query}\n\n"
         f"Retrieved Policy Evidence:\n{context_str}\n\n"
-        f"Provide a structured, authoritative answer for the risk analyst with precise citations:"
+        f"Provide a structured, authoritative, concise answer (under 180 words) for the risk analyst with precise citations for each claim:"
     )
 
     llm_resp = llm_client.generate_completion(system_prompt=system_prompt, user_prompt=user_prompt, max_tokens=600)

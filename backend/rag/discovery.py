@@ -35,6 +35,14 @@ def infer_category_and_source_type(file_path: str, base_dir: str = "knowledge_ba
     parts = rel_path.split("/")
     filename = os.path.basename(file_path).lower()
 
+    # Specific overrides for authoritative reference documents
+    if "fattdata" in filename:
+        return "AML/Sanctions", "official_regulation"
+    elif "frauddata" in filename:
+        return "regulations", "official_regulation"
+    elif "ftfe2" in filename:
+        return "research", "research"
+
     # Check immediate parent folder
     is_pdf = filename.endswith(".pdf")
     if len(parts) > 1:
@@ -88,6 +96,10 @@ def discover_documents(
             for file in files:
                 ext = os.path.splitext(file)[1].lower()
                 if ext not in SUPPORTED_EXTENSIONS:
+                    continue
+
+                # Template procedures are excluded from vector index to avoid retrieval pollution
+                if "sample_transaction_fraud_investigation_procedure" in file.lower():
                     continue
 
                 full_path = os.path.abspath(os.path.join(root, file))

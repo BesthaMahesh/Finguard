@@ -464,6 +464,14 @@ export const api = {
     return handleResponse(res);
   },
 
+  async resetDemoData(): Promise<any> {
+    const res = await apiFetch(`${API_BASE}/auth/reset-demo-data`, {
+      method: 'POST',
+      headers: getHeaders(),
+    });
+    return handleResponse(res);
+  },
+
   // Health and System Diagnostics
   async getHealth(): Promise<{ status: string; service: string; environment: string; architecture_layers: number; version: string; telemetry: string }> {
     const res = await apiFetch(`${API_BASE}/health`, { headers: getHeaders() });

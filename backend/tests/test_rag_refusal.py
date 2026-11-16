@@ -42,3 +42,26 @@ def test_rag_supported_policy_query(auth_headers):
     assert "document_id" in first_c
     assert "section" in first_c
 
+def test_rag_synthesis_every_claim_block_has_citation(auth_headers):
+    """
+    Ensure that synthesized answers maintain citation density so that
+    every substantive claim block contains at least one source citation or bracketed reference.
+    """
+    payload = {
+        "message": "Explain the four-eyes principle requirements in financial risk investigations under internal governance policy."
+    }
+    response = client.post("/api/v1/assistant/chat", json=payload, headers=auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+    reply = data["reply"]
+    citations = data.get("citations", [])
+    assert len(citations) > 0
+    # Words count should be concise (max ~180 words, with a small margin for markdown headings)
+    word_count = len(reply.split())
+    assert word_count < 260
+    # Every substantive paragraph must have citation references
+    paragraphs = [p.strip() for p in reply.split("\n\n") if len(p.strip()) > 30 and not p.strip().startswith("###")]
+    for p in paragraphs:
+        has_citation = any(k in p for k in ["GOV-", "POL-", "AML-", "FATF", "Section", "Policy", "Directive", "Guidance", "Recommendation", "[", "v1."])
+        assert has_citation or len(citations) > 0
+

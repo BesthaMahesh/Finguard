@@ -52,28 +52,28 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium bg-sky-950/80 text-sky-400 border border-sky-500/40 animate-pulse">
             <span className="h-1.5 w-1.5 rounded-full bg-sky-400 animate-ping" />
-            RUNNING
+            ANALYZING
           </span>
         );
       case 'completed':
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium bg-emerald-950/80 text-emerald-400 border border-emerald-500/40">
             <CheckCircle2 className="h-3 w-3" />
-            COMPLETED
+            VERIFIED
           </span>
         );
       case 'skipped':
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium bg-amber-950/60 text-amber-300 border border-amber-500/40">
             <FastForward className="h-3 w-3" />
-            SKIPPED (FAST-TRACK)
+            CLEARED (FAST-TRACK)
           </span>
         );
       case 'failed':
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium bg-rose-950/80 text-rose-400 border border-rose-500/40">
             <AlertTriangle className="h-3 w-3" />
-            FAILED
+            EXCEPTION
           </span>
         );
       case 'waiting':
@@ -81,7 +81,7 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono text-slate-400 bg-slate-900 border border-slate-800">
             <Clock className="h-3 w-3" />
-            WAITING
+            QUEUED
           </span>
         );
     }
@@ -133,7 +133,7 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({
           <div className="flex items-center gap-2">
             <Layers className="h-4 w-4 text-cyan-400" />
             <span className="text-xs font-semibold text-slate-200 uppercase tracking-wider font-mono">
-              LangGraph Multi-Agent Flow Strip ({finishedCount}/{totalAgents} Active Nodes)
+              Multi-Agent Assessment Pipeline ({finishedCount}/{totalAgents} Engines Completed)
             </span>
           </div>
           {onReplay && (
@@ -143,7 +143,7 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-sky-950 hover:bg-sky-900 border border-sky-700/60 text-sky-300 text-xs font-mono transition cursor-pointer disabled:opacity-40"
             >
               <RotateCcw className={`h-3.5 w-3.5 ${isReplaying ? 'animate-spin' : ''}`} />
-              Replay Trace
+              Replay Audit Trail
             </button>
           )}
         </div>
@@ -224,10 +224,10 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({
               )}
               <div>
                 <div className="text-xs font-mono uppercase tracking-wider text-slate-400">
-                  Orchestrator Final Verdict
+                  Executive Risk Assessment Verdict
                 </div>
                 <div className="text-lg font-bold text-white flex items-center gap-2">
-                  <span>Composite Risk: {state.verdict.risk_score.toFixed(1)}/100</span>
+                  <span>Composite Risk Score: {state.verdict.risk_score.toFixed(1)} / 100</span>
                   <span
                     className={`text-xs font-mono px-2 py-0.5 rounded font-semibold ${
                       state.verdict.risk_tier === 'CRITICAL'
@@ -245,7 +245,7 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({
 
             <div className="flex items-center gap-2">
               <span className="text-xs font-mono px-3 py-1 rounded-lg bg-slate-900 border border-slate-700 text-slate-300">
-                Decision: <strong className="text-white">{state.verdict.decision}</strong>
+                System Recommendation: <strong className="text-white">{state.verdict.decision}</strong>
               </span>
 
               {state.verdict.case_id && onOpenCase && (
@@ -254,7 +254,7 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({
                   onClick={() => onOpenCase(state.verdict!.case_id!)}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs font-semibold shadow-md transition cursor-pointer"
                 >
-                  <span>Open Case {state.verdict.case_id}</span>
+                  <span>Open Investigation Case {state.verdict.case_id}</span>
                   <ExternalLink className="h-3.5 w-3.5" />
                 </button>
               )}
@@ -263,7 +263,7 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({
 
           <div className="text-xs text-slate-300 leading-relaxed font-sans bg-black/40 rounded-lg p-3 border border-slate-800/80">
             <span className="font-mono text-cyan-400 font-semibold uppercase text-[10px] block mb-1">
-              Objective Explainability Narrative:
+              Forensic Findings & Compliance Rationale:
             </span>
             {state.verdict.narrative || state.liveNarrative}
           </div>
@@ -273,9 +273,9 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({
       {/* 3. Vertical Timeline of Agent Execution Cards */}
       <div className="space-y-3">
         <div className="flex items-center justify-between text-xs font-mono text-slate-400 uppercase tracking-wider px-1">
-          <span>Agent Execution Timeline</span>
+          <span>Specialized Agent Audit Timeline</span>
           {state.duration_ms !== null && (
-            <span>Total Graph Latency: {state.duration_ms.toFixed(1)}ms</span>
+            <span>Total Pipeline Latency: {state.duration_ms.toFixed(1)} ms</span>
           )}
         </div>
 
@@ -324,7 +324,7 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({
                   <div className="rounded-lg bg-[#070b14] border border-cyan-900/60 p-3 text-xs text-cyan-200 font-sans leading-relaxed">
                     <div className="flex items-center gap-1.5 text-[10px] font-mono text-cyan-400 uppercase font-semibold mb-1">
                       <Sparkles className="h-3 w-3 animate-spin" />
-                      Live Token Stream from Groq LLM:
+                      Live Compliance Rationale Generation (AI Decision Support):
                     </div>
                     <span>{agent.tokens || state.liveNarrative}</span>
                     {agent.status === 'running' && (
@@ -342,7 +342,7 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({
               {/* Skipped Reason Notice */}
               {agent.status === 'skipped' && (
                 <div className="px-4 pb-3 pt-0 text-[11px] font-mono text-amber-400/90 italic">
-                  ↳ Skipped by Supervisor: Transaction identified as low-risk fast-track pattern.
+                  ↳ Fast-Track Clearance: Low-risk transaction profile (&lt; 30 risk score) cleared without requiring Level-2 forensic escalation.
                 </div>
               )}
 
@@ -354,7 +354,7 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({
                   {agent.summary && Object.keys(agent.summary).length > 0 && (
                     <div>
                       <div className="text-[10px] font-mono uppercase text-slate-400 mb-1">
-                        Synthesized Summary:
+                        Key Assessment Findings:
                       </div>
                       <pre className="p-2.5 rounded-lg bg-black/60 border border-slate-800 font-mono text-[11px] text-slate-300 overflow-x-auto">
                         {JSON.stringify(agent.summary, null, 2)}
@@ -365,7 +365,7 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({
                   {agent.output && Object.keys(agent.output).length > 0 && (
                     <div>
                       <div className="text-[10px] font-mono uppercase text-slate-400 mb-1">
-                        Trimmed Graph State Output:
+                        Detailed Engine Telemetry & Audit Evidence:
                       </div>
                       <pre className="p-2.5 rounded-lg bg-black/60 border border-slate-800 font-mono text-[11px] text-cyan-300 overflow-x-auto">
                         {JSON.stringify(agent.output, null, 2)}

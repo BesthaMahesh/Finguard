@@ -286,3 +286,28 @@ def reset_user_password(
     )
 
     return {"message": f"Password for user '{user.username}' has been updated successfully."}
+
+@router.post("/reset-demo-data")
+def trigger_reset_demo_data(
+    admin_user: dict = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Admin-only endpoint to reset platform to clean demo seed state."""
+    from scripts.reset_demo_data import reset_demo_data
+    result = reset_demo_data()
+
+    _record_audit_log(
+        db,
+        actor_id=admin_user["username"],
+        actor_role=admin_user["role"],
+        action="DEMO_DATA_RESET",
+        target_type="DATABASE",
+        target_id="finguard.db",
+        outcome="SUCCESS",
+        details=result
+    )
+
+    return {
+        "message": "Demo data restored successfully to 12,000 historical records and 25 verified investigation cases.",
+        "details": result
+    }

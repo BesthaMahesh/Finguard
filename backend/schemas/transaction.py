@@ -31,28 +31,7 @@ class TransactionBase(BaseModel):
         return round(v, 2)
 
 class TransactionCreate(TransactionBase):
-    @model_validator(mode="after")
-    def validate_ledger_consistency(self):
-        t = self.type
-        old_org = self.old_balance_org
-        new_org = self.new_balance_orig
-
-        # Outbound types: money leaves the sender
-        if t in {"PAYMENT", "TRANSFER", "CASH_OUT", "DEBIT"}:
-            if new_org > old_org:
-                raise ValueError(
-                    f"Impossible ledger: Origin balance cannot increase from ${old_org:,.2f} to ${new_org:,.2f} on outbound {t} transaction."
-                )
-            if new_org > round(old_org - self.amount, 2) + 0.01:
-                raise ValueError(
-                    f"Impossible ledger discrepancy: For {t} of ${self.amount:,.2f}, origin balance cannot decrease by less than the transferred amount (old: ${old_org:,.2f}, new: ${new_org:,.2f})."
-                )
-        elif t == "CASH_IN":
-            if new_org < old_org:
-                raise ValueError(
-                    f"Impossible ledger: Origin balance cannot decrease from ${old_org:,.2f} to ${new_org:,.2f} on inbound CASH_IN transaction."
-                )
-        return self
+    pass
 
 class TransactionResponse(TransactionBase):
     id: int
@@ -62,7 +41,12 @@ class TransactionResponse(TransactionBase):
     fraud_probability: Optional[float] = None
     risk_score: Optional[float] = None
     risk_level: Optional[str] = "LOW"
+    decision: Optional[str] = "APPROVE"
     status: Optional[str] = "UNREVIEWED"
+    rule_flags: Optional[Any] = None
+    case_id: Optional[str] = None
+    warnings: List[str] = Field(default_factory=list)
+    created_at: Optional[datetime] = None
     rule_flags: Optional[Any] = None
     case_id: Optional[str] = None
     created_at: Optional[datetime] = None

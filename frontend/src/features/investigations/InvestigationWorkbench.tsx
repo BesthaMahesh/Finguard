@@ -41,89 +41,67 @@ import { streamAgentWorkflow } from '../agents/streamClient';
 interface InvestigationWorkbenchProps {
   userRole: UserRole;
   initialTxId?: number | null;
+  currentUsername?: string;
 }
 
 const AGENT_METADATA: Record<string, { role: string; layer: string; explanation: string }> = {
   'SUPERVISOR AGENT': {
-    role: 'Workflow Orchestrator & Intent Planner',
+    role: 'Workflow Orchestration & Intake Triage',
     layer: 'Layer 2: Orchestration & Control Plane',
     explanation:
-      'Coordinates LangGraph workflow execution, assigns correlation IDs, enforces role-based access boundaries, and conditionally routes high-risk transactions to deep forensic analysis.',
+      'Initializes the investigation session, establishes cryptographic audit tracking, and dynamically routes transactions between fast-track clearance and deep forensic review.',
   },
   'TRANSACTION INTAKE AGENT': {
-    role: 'Schema Validation & Boundary Ingestion',
+    role: 'Ingestion & Ledger Normalization',
     layer: 'Layer 8: Data Sources & Ledger Interface',
     explanation:
-      'Validates input payload fields, checks balance precision, formats transaction timestamps, and unpacks origin and destination counterparty metadata.',
+      'Validates transaction schema, standardizes currency decimal precision, and verifies counterparty account identifiers.',
   },
   'DATA QUALITY AGENT': {
-    role: 'LeakageGuard & Balance Invariant Checker',
+    role: 'Ledger Reconciliation & Integrity',
     layer: 'Layer 4: Financial Risk Intelligence',
     explanation:
-      'Audits debit/credit sign consistency, checks non-negative balance constraints, and guarantees 0% target leakage between training and inference pipelines.',
+      'Audits double-entry ledger mathematics, detects balance anomalies or merchant balance discrepancies, and guarantees unbiased model inputs.',
   },
   'FRAUD DETECTION AGENT': {
-    role: 'Random Forest Inference & Rule Evaluator',
+    role: 'Predictive Fraud Analytics & Rules',
     layer: 'Layer 4: Machine Learning Engine',
     explanation:
-      'Executes Scikit-Learn Random Forest model inference and checks deterministic rules (RULE_LIQUIDATION_DRAIN, RULE_HIGH_VALUE_THRESHOLD, RULE_LEDGER_INCONSISTENCY).',
+      'Evaluates statistical fraud probability via machine learning algorithms and applies deterministic statutory rule screening.',
   },
   'RISK ASSESSMENT AGENT': {
-    role: 'Composite Risk Synthesizer',
+    role: 'Composite Risk Scoring & Thresholds',
     layer: 'Layer 4: Risk Fusion & Checkpoints',
     explanation:
-      'Synthesizes ML fraud probabilities and deterministic rule penalties into a 0-100 composite risk score; marks mandatory human-in-the-loop review checkpoints for scores >= 70.',
+      'Harmonizes predictive probabilities, exposure factors, and statutory rule floors into a calibrated 0–100 risk score, triggering mandatory 4-Eyes review for high-risk profiles.',
   },
   'INVESTIGATION AGENT': {
-    role: 'Forensic Ledger & Velocity Specialist',
+    role: 'Forensic Pattern & Counterparty Analysis',
     layer: 'Layer 2: In-Depth Forensic Analysis',
     explanation:
-      'Examines balance liquidation deltas, rapid pass-through velocity, cross-border or counterparty relationships, and historical account behavioral patterns.',
+      'Examines balance liquidation deltas, rapid fund pass-through velocity, cross-border exposure, and counterparty relationship graphs.',
   },
   'POLICY & COMPLIANCE AGENT': {
-    role: 'ChromaDB Regulatory RAG Specialist',
+    role: 'Statutory & Regulatory Compliance',
     layer: 'Layer 3: Knowledge & Memory Layer',
     explanation:
-      'Executes semantic vector search across indexed AML/KYC directives, FATF typologies, and internal governance manuals to retrieve grounded statutory excerpts.',
+      'Cross-references regulatory frameworks (FATF Recommendation 16, AML-04, KYC Guidelines) and binds authoritative legal citations.',
   },
   'EXPLAINABILITY AGENT': {
-    role: 'TreeSHAP & Objective Narrative Synthesizer',
+    role: 'Explainability & Findings Synthesizer',
     layer: 'Layer 4 & 2: Explainability & LLM Integration',
     explanation:
-      'Extracts TreeSHAP feature attributions and uses Groq LLM to synthesize objective risk narratives strictly constrained against ungrounded or speculative guilt claims.',
+      'Synthesizes key feature attributions and regulatory mandates into an objective, fact-grounded compliance narrative without speculative language.',
   },
   'AUDIT & REPORTING AGENT': {
-    role: 'Dossier Compiler & SHA-256 Ledger Sealer',
+    role: 'Audit Docket & Hash Chain Finalizer',
     layer: 'Layer 7: Governance, Security & Trust Layer',
     explanation:
-      'Compiles the final structured investigation docket, verifies 4-Eyes requirements, and seals an immutable audit event using cryptographic SHA-256 hash chaining.',
+      'Compiles the complete investigation dossier, redacts customer PII, and seals the record into the tamper-evident SHA-256 cryptographic audit chain.',
   },
 };
 
-const PRESET_REVIEW_TEMPLATES = [
-  {
-    label: '🚨 Escalate to SAR',
-    disposition: 'ESCALATE_TO_SAR',
-    note: 'Confirmed complete account liquidation matching AML-04 Section 2.1 typology. Origin balance dropped to zero with zero counterparty history. Escalated to compliance officer for FinCEN SAR filing.',
-  },
-  {
-    label: '❄️ Freeze Account',
-    disposition: 'FREEZE_ACCOUNT',
-    note: 'Critical risk score with rapid liquidation drain and high value exposure. Emergency freeze placed on origin account pending secondary identity verification under policy POL-AML-2024-04.',
-  },
-  {
-    label: '✅ Clear (False Positive)',
-    disposition: 'DISMISS_FALSE_POSITIVE',
-    note: 'Verified legitimate corporate payroll transfer against corporate invoice history. Source of wealth confirmed; cleared as authorized false positive.',
-  },
-  {
-    label: '📋 Request Additional KYC',
-    disposition: 'REQUEST_ADDITIONAL_KYC',
-    note: 'Unusual transaction velocity detected. Origin account flagged for enhanced customer due diligence (EDD) and updated source of wealth declaration.',
-  },
-];
-
-export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ userRole, initialTxId }) => {
+export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ userRole, initialTxId, currentUsername }) => {
   const [cases, setCases] = useState<InvestigationCase[]>([]);
   const [selectedCase, setSelectedCase] = useState<InvestigationCase | null>(null);
   const [loading, setLoading] = useState(true);
@@ -137,24 +115,64 @@ export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ 
   const [expandedStepIndex, setExpandedStepIndex] = useState<number | null>(null);
   const [runningLiveWorkflow, setRunningLiveWorkflow] = useState(false);
 
-  // Disposition form states
-  const [disposition, setDisposition] = useState('ESCALATE_TO_SAR');
+  // Disposition form states (defaults to unselected per 4-Eyes policy)
+  const [disposition, setDisposition] = useState('');
   const [notes, setNotes] = useState('');
+  const [selectedEvidence, setSelectedEvidence] = useState<string[]>([]);
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewSuccessMsg, setReviewSuccessMsg] = useState<string | null>(null);
   const [reviewErrorMsg, setReviewErrorMsg] = useState<string | null>(null);
+
+  // 4-Eyes principle: submitter cannot review their own submission
+  const isSubmitter = Boolean(
+    selectedCase?.submitted_by &&
+    currentUsername &&
+    selectedCase.submitted_by.toLowerCase() === currentUsername.toLowerCase()
+  );
 
   useEffect(() => {
     setLiveTimeline(null);
     setExpandedStepIndex(null);
     setReviewSuccessMsg(null);
     setReviewErrorMsg(null);
+    setDisposition('');
+    setNotes('');
+    setSelectedEvidence([]);
     if (selectedCase) {
       loadCaseTrace(selectedCase.case_number);
     } else {
       setCaseWorkflowState(null);
     }
   }, [selectedCase?.id, selectedCase?.case_number]);
+
+  const availableEvidence: string[] = React.useMemo(() => {
+    if (!selectedCase) return [];
+    const items = new Set<string>();
+
+    if (selectedCase.title.toLowerCase().includes('ledger') || selectedCase.summary.toLowerCase().includes('variance')) {
+      items.add('Ledger Reconciliation Variance');
+    }
+    if (selectedCase.summary.toLowerCase().includes('liquidation') || selectedCase.title.toLowerCase().includes('liquidation')) {
+      items.add('Full Account Liquidation (AML-04)');
+    }
+    if (selectedCase.summary.toLowerCase().includes('large value') || selectedCase.title.toLowerCase().includes('threshold')) {
+      items.add('Large Value Exposure (>200k units)');
+    }
+    if (selectedCase.policy_citations_json) {
+      try {
+        const cits = JSON.parse(selectedCase.policy_citations_json);
+        cits.forEach((c: any) => {
+          if (c.document_title) items.add(`Citation: ${c.document_title}`);
+        });
+      } catch (e) {}
+    }
+    if (items.size === 0) {
+      items.add('Core Banking Ledger Invariant Check');
+      items.add('ML High-Risk Classification');
+      items.add('AML-04 Rapid Liquidation Guideline');
+    }
+    return Array.from(items);
+  }, [selectedCase]);
 
   const loadCaseTrace = async (caseId: string) => {
     try {
@@ -321,8 +339,18 @@ export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ 
     e.preventDefault();
     if (!selectedCase) return;
     
-    if (!notes.trim() || notes.trim().length < 5) {
-      setReviewErrorMsg('Investigator notes are required (minimum 5 characters) to establish an audited review record.');
+    if (!disposition) {
+      setReviewErrorMsg('Please select an authoritative disposition decision.');
+      return;
+    }
+
+    if (!notes.trim() || notes.trim().length < 30) {
+      setReviewErrorMsg('Investigator notes must be at least 30 characters in length to establish an audited review record.');
+      return;
+    }
+
+    if (selectedEvidence.length === 0) {
+      setReviewErrorMsg('At least one evidence item must be selected and cited in the review docket.');
       return;
     }
 
@@ -488,7 +516,7 @@ export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ 
           {selectedCase ? (
             <div className="rounded-xl bg-[#11192e] border border-slate-800/80 p-5 space-y-6 shadow-sm">
               {/* Dossier Header */}
-              <div className="border-b border-slate-800 pb-4 space-y-2">
+              <div className="border-b border-slate-800 pb-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-base font-bold text-white font-mono">
@@ -502,6 +530,21 @@ export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ 
                 </div>
 
                 <h3 className="text-sm font-semibold text-slate-200">{selectedCase.title}</h3>
+
+                {/* Submitter & Reviewer Audit Provenance */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-[#0a0f1d] p-2.5 rounded-lg border border-slate-800/80 font-mono">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500">Submitted by:</span>
+                    <span className="text-cyan-400 font-semibold">{selectedCase.submitted_by || 'system (Automated Ingestion)'}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500">Reviewed by:</span>
+                    <span className={selectedCase.reviewed_by ? 'text-emerald-400 font-semibold' : 'text-amber-400'}>
+                      {selectedCase.reviewed_by ? `${selectedCase.reviewed_by} (${new Date(selectedCase.reviewed_at || Date.now()).toLocaleDateString()})` : 'Pending 4-Eyes Review'}
+                    </span>
+                  </div>
+                </div>
+
                 <div className="text-xs text-slate-400 font-mono">
                   Associated Transaction ID: #{selectedCase.transaction_id} • Assigned: {selectedCase.assigned_to || 'Risk Analyst Queue'}
                 </div>
@@ -540,7 +583,7 @@ export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ 
                         Investigation Multi-Agent Execution Trace ({caseWorkflowState.agents.length} Agents)
                       </span>
                       <span className="text-[10px] text-slate-500 font-mono block">
-                        Verified LangGraph node trace • Replay historical decision or trigger live re-analysis
+                        Verified Multi-Agent Audit Trace • Replay historical decision or trigger live re-assessment
                       </span>
                     </div>
 
@@ -549,17 +592,17 @@ export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ 
                       onClick={handleRunLiveMultiAgent}
                       disabled={runningLiveWorkflow}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-950/80 hover:bg-sky-900 border border-sky-700/60 text-sky-300 text-xs font-mono transition cursor-pointer disabled:opacity-50 shadow-sm"
-                      title="Re-runs the real-time LangGraph multi-agent workflow"
+                      title="Re-evaluates this transaction through the live multi-agent risk assessment pipeline"
                     >
                       {runningLiveWorkflow ? (
                         <>
                           <RefreshCw className="h-3.5 w-3.5 animate-spin text-sky-400" />
-                          <span>Running 10 Agents...</span>
+                          <span>Running Risk Engines...</span>
                         </>
                       ) : (
                         <>
                           <Zap className="h-3.5 w-3.5 text-amber-400" />
-                          <span>Replay Agent Run Live</span>
+                          <span>Replay Live Multi-Agent Assessment</span>
                         </>
                       )}
                     </button>
@@ -598,7 +641,7 @@ export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ 
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider font-mono flex items-center gap-1.5">
                     <UserCheck className="h-4 w-4 text-emerald-400" />
-                    Investigator Disposition & Review
+                    Investigator Disposition & Review (4-Eyes Principle)
                   </span>
                   {selectedCase.reviewed_by && (
                     <span className="text-[10px] text-slate-500 font-mono">
@@ -606,6 +649,19 @@ export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ 
                     </span>
                   )}
                 </div>
+
+                {/* 4-Eyes Warning Banner if Current User Submitted Transaction */}
+                {isSubmitter && (
+                  <div className="p-3.5 rounded-xl bg-amber-950/40 border border-amber-800/80 text-amber-200 text-xs flex items-start gap-2.5">
+                    <ShieldAlert className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <div className="font-semibold text-amber-300">4-Eyes Principle Enforced</div>
+                      <p className="text-amber-400/90 mt-0.5 leading-relaxed">
+                        4-Eyes principle: As the submitter of this transaction ({selectedCase.submitted_by}), you cannot approve its disposition. A second investigator must review it.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {reviewSuccessMsg && (
                   <div className="p-3 rounded-lg bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
@@ -621,14 +677,19 @@ export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ 
                   </div>
                 )}
 
-                <form onSubmit={handleDispositionSubmit} className="space-y-3">
+                <form onSubmit={handleDispositionSubmit} className="space-y-4">
+                  {/* 1. Disposition Decision Dropdown (default empty) */}
                   <div className="space-y-1">
-                    <label className="text-xs text-slate-400 font-medium">Disposition Decision</label>
+                    <label className="text-xs text-slate-400 font-medium">
+                      Disposition Decision <span className="text-rose-400">*</span>
+                    </label>
                     <select
                       value={disposition}
+                      disabled={isSubmitter}
                       onChange={(e) => setDisposition(e.target.value)}
-                      className="w-full bg-[#0a0f1d] border border-slate-700/80 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500 cursor-pointer"
+                      className="w-full bg-[#0a0f1d] border border-slate-700/80 rounded-lg p-2.5 text-xs text-slate-200 focus:outline-none focus:border-sky-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     >
+                      <option value="">Select decision...</option>
                       <option value="ESCALATE_TO_SAR">
                         Escalate — File Suspicious Activity Report (SAR)
                       </option>
@@ -644,56 +705,102 @@ export const InvestigationWorkbench: React.FC<InvestigationWorkbenchProps> = ({ 
                     </select>
                   </div>
 
-                  {/* One-Click Presets for Demo */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px] text-slate-400">
-                      <span>Quick Demo Findings Templates:</span>
-                      <span className="text-[10px] text-slate-500 font-mono">1-Click Auto-Fill</span>
+                  {/* 2. Structured Evidence Checkboxes (No coached conclusions) */}
+                  <div className="space-y-2 p-3 rounded-lg bg-[#0a0f1d] border border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-slate-300 uppercase tracking-wider font-mono">
+                        Evidence Items to Cite <span className="text-rose-400">* (at least 1 required)</span>
+                      </span>
+                      <button
+                        type="button"
+                        disabled={isSubmitter || selectedEvidence.length === 0}
+                        onClick={() => {
+                          const tmpl = `[Evidence reviewed: ${selectedEvidence.join('; ')}] - Observed: <describe specific anomalous activity> - Action: <justification for ${disposition || 'decision'}>`;
+                          setNotes(tmpl);
+                        }}
+                        className="text-[10px] text-sky-400 hover:text-sky-300 disabled:opacity-40 font-mono transition cursor-pointer"
+                      >
+                        📋 Insert Review Template with Evidence
+                      </button>
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {PRESET_REVIEW_TEMPLATES.map((tmpl, tIdx) => (
-                        <button
-                          key={tIdx}
-                          type="button"
-                          onClick={() => {
-                            setDisposition(tmpl.disposition);
-                            setNotes(tmpl.note);
-                            if (reviewErrorMsg) setReviewErrorMsg(null);
-                          }}
-                          className="px-2.5 py-1 rounded-md bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-300 text-[11px] font-medium transition cursor-pointer flex items-center gap-1 shadow-sm"
-                        >
-                          {tmpl.label}
-                        </button>
-                      ))}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
+                      {availableEvidence.map((ev) => {
+                        const isChecked = selectedEvidence.includes(ev);
+                        return (
+                          <label
+                            key={ev}
+                            className={`flex items-center gap-2 p-2 rounded-md border text-xs cursor-pointer transition select-none ${
+                              isChecked
+                                ? 'bg-sky-950/40 border-sky-600/60 text-sky-200'
+                                : 'bg-[#11192e] border-slate-800 text-slate-400 hover:border-slate-700'
+                            } ${isSubmitter ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            <input
+                              type="checkbox"
+                              disabled={isSubmitter}
+                              checked={isChecked}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedEvidence((prev) => [...prev, ev]);
+                                } else {
+                                  setSelectedEvidence((prev) => prev.filter((x) => x !== ev));
+                                }
+                              }}
+                              className="rounded border-slate-700 bg-slate-900 text-sky-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                            />
+                            <span className="truncate text-[11px]">{ev}</span>
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
 
+                  {/* 3. Investigator Review Findings (min 30 characters) */}
                   <div className="space-y-1">
-                    <label className="text-xs text-slate-400 font-medium">
-                      Investigator Review Findings & Notes
-                    </label>
+                    <div className="flex items-center justify-between text-xs">
+                      <label className="text-slate-400 font-medium">
+                        Investigator Review Findings & Notes <span className="text-rose-400">*</span>
+                      </label>
+                      <span className={`text-[10px] font-mono ${notes.trim().length >= 30 ? 'text-emerald-400' : 'text-slate-500'}`}>
+                        {notes.trim().length}/30 min chars
+                      </span>
+                    </div>
                     <textarea
                       required
-                      minLength={5}
+                      disabled={isSubmitter}
                       rows={3}
                       value={notes}
                       onChange={(e) => {
                         setNotes(e.target.value);
                         if (reviewErrorMsg) setReviewErrorMsg(null);
                       }}
-                      placeholder="Enter verified factual observations, rationale, and evidence review notes (minimum 5 characters)..."
-                      className="w-full bg-[#0a0f1d] border border-slate-700/80 rounded-lg p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 font-sans"
+                      placeholder="Enter verified factual observations, rationale, and evidence review notes (minimum 30 characters)..."
+                      className="w-full bg-[#0a0f1d] border border-slate-700/80 rounded-lg p-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-sky-500 font-sans disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                   </div>
 
+                  {/* 4. Action Button */}
                   <button
                     type="submit"
-                    disabled={submittingReview}
-                    className="w-full py-2.5 px-4 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-50 text-white font-medium text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-sky-600/20"
+                    disabled={
+                      isSubmitter ||
+                      submittingReview ||
+                      !disposition ||
+                      notes.trim().length < 30 ||
+                      selectedEvidence.length === 0
+                    }
+                    className="w-full py-2.5 px-4 rounded-lg bg-sky-600 hover:bg-sky-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-sky-600/20"
                   >
                     <Send className="h-3.5 w-3.5" />
                     {submittingReview ? 'Recording Disposition...' : 'Commit Disposition (Audit Logged)'}
                   </button>
+
+                  {(!disposition || notes.trim().length < 30 || selectedEvidence.length === 0) && !isSubmitter && (
+                    <p className="text-[10px] text-slate-500 text-center font-mono">
+                      Submission requires choosing a decision, citing &ge;1 evidence item, and &ge;30 characters of findings.
+                    </p>
+                  )}
                 </form>
 
               </div>

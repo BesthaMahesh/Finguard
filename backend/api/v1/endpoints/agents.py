@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from backend.db.session import SessionLocal
 from backend.db.models import AgentRun, InvestigationCase, Transaction, AuditEvent
+from backend.core.decision_policy import evaluate_decision_policy, generate_next_case_number
 from backend.graphs.investigation_graph import (
     AGENT_REGISTRY,
     investigation_workflow,
@@ -27,6 +28,7 @@ router = APIRouter(prefix="/agents", tags=["Agent Workflow & Live Streaming"])
 
 class StreamAnalyzeRequest(BaseModel):
     transaction_id: Optional[int] = None
+    is_simulation: Optional[bool] = False
     step: Optional[int] = 1
     type: Optional[str] = "TRANSFER"
     amount: Optional[float] = 0.0
@@ -58,9 +60,11 @@ def build_trimmed_summary(node_name: str, state_delta: Dict[str, Any]) -> Dict[s
     elif node_name == "data_quality":
         dq = state_delta.get("data_quality_report", {})
         summary = {
-            "is_valid": dq.get("is_valid", True),
-            "checks_passed": dq.get("checks_passed", 0),
-            "target_leakage_risk": dq.get("target_leakage_risk", "ZERO_DETECTED")
+            "status": dq.get("status", "PASSED"),
+            "flags": dq.get("flags", []),
+            "origin_variance": dq.get("origin_variance", 0.0),
+            "dest_variance": dq.get("dest_variance", 0.0),
+            "issues_count": len(dq.get("issues", []))
         }
     elif node_name == "fraud_detector":
         pred = state_delta.get("model_prediction", {})
@@ -83,7 +87,8 @@ def build_trimmed_summary(node_name: str, state_delta: Dict[str, Any]) -> Dict[s
         summary = {
             "composite_risk_score": risk.get("composite_risk_score", 0.0),
             "operational_risk_level": risk.get("operational_risk_level", "LOW"),
-            "requires_human_review": risk.get("requires_human_review", False)
+            "requires_human_review": risk.get("requires_human_review", False),
+            "decision": risk.get("decision", "APPROVE")
         }
     elif node_name == "investigator":
         ev = state_delta.get("investigation_evidence", {})
@@ -100,8 +105,11 @@ def build_trimmed_summary(node_name: str, state_delta: Dict[str, Any]) -> Dict[s
             "section": citations[0].get("section") if citations else "None"
         }
     elif node_name == "explainability":
+        val = state_delta.get("explanation_validation", {})
         summary = {
-            "narrative_preview": state_delta.get("explanation_summary", "")[:100] + "...",
+            "narrative_preview": state_delta.get("explanation_summary", "")[:120] + ("..." if len(state_delta.get("explanation_summary", "")) > 120 else ""),
+            "validator_result": val.get("validator_result", "VALIDATED"),
+            "is_fallback": val.get("is_fallback", False),
             "tokens_consumed": state_delta.get("tokens_consumed", 0)
         }
     elif node_name == "audit_reporter":
@@ -111,7 +119,7 @@ def build_trimmed_summary(node_name: str, state_delta: Dict[str, Any]) -> Dict[s
             "audit_hash": rep.get("audit_hash", "GENESIS")[:12] + "...",
             "human_in_loop_mandate": state_delta.get("requires_human_review", False)
         }
-    return pii_protector.sanitize_dictionary(summary)
+    return summary
 
 def trim_output(node_name: str, state_delta: Dict[str, Any]) -> Dict[str, Any]:
     """Returns safe, trimmed output data without spilling enormous raw state."""
@@ -124,7 +132,7 @@ def trim_output(node_name: str, state_delta: Dict[str, Any]) -> Dict[str, Any]:
         "risk_assessment": ["risk_assessment", "requires_human_review"],
         "investigator": ["investigation_evidence"],
         "policy_compliance": ["policy_citations"],
-        "explainability": ["explanation_summary", "tokens_consumed"],
+        "explainability": ["explanation_summary", "explanation_validation", "tokens_consumed"],
         "audit_reporter": ["final_report"]
     }
     allowed = keys_of_interest.get(node_name, [])
@@ -272,44 +280,72 @@ async def analyze_stream(
                         "output": {}
                     })
 
-            # 3. Assemble verdict and auto-create case if High/Critical
+            # 3. Assemble verdict via Unified Decision Policy (Single Source of Truth)
             risk = final_state.get("risk_assessment", {})
-            score = risk.get("composite_risk_score", 0.0)
-            tier = risk.get("operational_risk_level", "LOW")
+            score = float(risk.get("composite_risk_score", 0.0))
+            dq_flags = final_state.get("data_quality_report", {}).get("flags", [])
+            pred_rules = [r.get("rule_id", "") for r in final_state.get("model_prediction", {}).get("rule_flags", []) if isinstance(r, dict)]
+            
+            policy_verdict = evaluate_decision_policy(
+                risk_score=score,
+                rule_flags=pred_rules,
+                data_quality_flags=dq_flags,
+                transaction=raw_tx
+            )
+            decision = policy_verdict.decision
+            tier = policy_verdict.risk_tier
             narrative = final_state.get("explanation_summary", "No anomalies identified.")
-            requires_human_review = final_state.get("requires_human_review", False)
-            decision = "MANDATORY_REVIEW" if requires_human_review else "CLEARED_FAST_TRACK"
 
-            # Auto-case creation for High or Critical transactions
-            db = SessionLocal()
-            try:
-                if (score >= 65.0 or requires_human_review) and target_tx_id:
+            # What-If Simulation check (Item E): Simulations never create cases or alter transactions
+            is_simulation = bool(req.is_simulation)
+            if target_tx_id and not is_simulation:
+                db_chk = SessionLocal()
+                try:
+                    persisted_tx = db_chk.query(Transaction).filter_by(id=target_tx_id).first()
+                    if persisted_tx:
+                        if (
+                            abs(persisted_tx.amount - float(raw_tx.get("amount", 0))) > 0.01 or
+                            persisted_tx.name_orig != raw_tx.get("nameOrig") or
+                            persisted_tx.name_dest != raw_tx.get("nameDest") or
+                            abs(persisted_tx.old_balance_org - float(raw_tx.get("oldbalanceOrg", 0))) > 0.01 or
+                            abs(persisted_tx.new_balance_orig - float(raw_tx.get("newbalanceOrig", 0))) > 0.01
+                        ):
+                            is_simulation = True
+                finally:
+                    db_chk.close()
+
+            created_case_id: Optional[str] = None
+            if not is_simulation and policy_verdict.case_created and target_tx_id:
+                db = SessionLocal()
+                try:
                     existing_case = db.query(InvestigationCase).filter_by(transaction_id=target_tx_id).first()
                     if existing_case:
                         created_case_id = existing_case.case_number
                     else:
-                        case_num = f"CASE-FG-{target_tx_id:06d}"
+                        case_num = generate_next_case_number(db)
                         new_case = InvestigationCase(
                             case_number=case_num,
                             transaction_id=target_tx_id,
-                            title=f"Suspicious {raw_tx.get('type')} Transfer - ${raw_tx.get('amount', 0):,.2f}",
+                            title=policy_verdict.title,
                             status="OPEN",
-                            priority="CRITICAL" if score >= 85.0 else "HIGH",
+                            priority=policy_verdict.priority,
                             assigned_to="Financial Crime Unit (AI Triage)",
                             risk_score=score,
-                            summary=narrative,
+                            summary=policy_verdict.summary_reason,
                             model_features_json=json.dumps(final_state.get("feature_attributions", [])),
                             policy_citations_json=json.dumps(final_state.get("policy_citations", [])),
                             agent_workflow_trace_json=json.dumps(final_state.get("timeline", []))
                         )
+                        if hasattr(new_case, "submitted_by"):
+                            new_case.submitted_by = user_name
                         db.add(new_case)
                         db.commit()
                         created_case_id = case_num
-            except Exception as e:
-                logger.error(f"Error checking/creating investigation case: {e}")
-                db.rollback()
-            finally:
-                db.close()
+                except Exception as e:
+                    logger.error(f"Error checking/creating investigation case: {e}")
+                    db.rollback()
+                finally:
+                    db.close()
 
             total_duration_ms = round((time.time() - start_overall) * 1000.0, 2)
 
@@ -318,9 +354,10 @@ async def analyze_stream(
                 "result": {
                     "risk_score": score,
                     "risk_tier": tier,
-                    "decision": decision,
+                    "decision": f"{decision} (SIMULATION)" if is_simulation else decision,
                     "narrative": narrative,
-                    "case_id": created_case_id
+                    "case_id": created_case_id,
+                    "is_simulation": is_simulation
                 },
                 "duration_ms": total_duration_ms
             })

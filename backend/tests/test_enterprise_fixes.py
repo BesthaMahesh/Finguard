@@ -87,11 +87,13 @@ def test_transaction_inspect_invalid_id(user_headers):
 
 def test_investigation_review_submission(admin_headers):
     # Fetch first available case
-    list_resp = client.get("/api/v1/investigations?limit=1", headers=admin_headers)
+    list_resp = client.get("/api/v1/investigations?limit=20", headers=admin_headers)
     assert list_resp.status_code == 200
     cases = list_resp.json()["items"]
     assert len(cases) > 0
-    case_id = cases[0]["id"]
+    # 4-Eyes principle: reviewer cannot review their own submission
+    valid_cases = [c for c in cases if c.get("submitted_by") != "admin"]
+    case_id = valid_cases[0]["id"] if valid_cases else cases[0]["id"]
 
     # Submit valid review
     review_payload = {
@@ -106,8 +108,9 @@ def test_investigation_review_submission(admin_headers):
     assert updated_case["status"] == "CLOSED_RESOLVED"
 
 def test_investigation_review_alias_normalization(admin_headers):
-    list_resp = client.get("/api/v1/investigations?limit=1", headers=admin_headers)
-    case_id = list_resp.json()["items"][0]["id"]
+    list_resp = client.get("/api/v1/investigations?limit=20", headers=admin_headers)
+    valid_cases = [c for c in list_resp.json()["items"] if c.get("submitted_by") != "admin"]
+    case_id = valid_cases[0]["id"]
 
     # Submit with frontend alias CONFIRMED_FRAUD_FREEZE
     payload = {
@@ -120,8 +123,9 @@ def test_investigation_review_alias_normalization(admin_headers):
     assert data["disposition"] == "FREEZE_ACCOUNT"
 
 def test_investigation_review_invalid_input(admin_headers):
-    list_resp = client.get("/api/v1/investigations?limit=1", headers=admin_headers)
-    case_id = list_resp.json()["items"][0]["id"]
+    list_resp = client.get("/api/v1/investigations?limit=20", headers=admin_headers)
+    valid_cases = [c for c in list_resp.json()["items"] if c.get("submitted_by") != "admin"]
+    case_id = valid_cases[0]["id"]
 
     # Invalid disposition
     resp = client.post(f"/api/v1/investigations/{case_id}/review", json={"disposition": "INVALID_ACTION", "disposition_notes": "Valid note here"}, headers=admin_headers)
@@ -132,11 +136,12 @@ def test_investigation_review_invalid_input(admin_headers):
     assert resp.status_code == 422
 
 def test_investigation_review_idempotency(admin_headers):
-    list_resp = client.get("/api/v1/investigations?limit=1", headers=admin_headers)
-    case_id = list_resp.json()["items"][0]["id"]
+    list_resp = client.get("/api/v1/investigations?limit=20", headers=admin_headers)
+    valid_cases = [c for c in list_resp.json()["items"] if c.get("submitted_by") != "admin"]
+    case_id = valid_cases[0]["id"]
     payload = {
         "disposition": "FREEZE_ACCOUNT",
-        "disposition_notes": "Idempotent submission check."
+        "disposition_notes": "Idempotent submission check under enterprise protocol."
     }
     resp1 = client.post(f"/api/v1/investigations/{case_id}/review", json=payload, headers=admin_headers)
     resp2 = client.post(f"/api/v1/investigations/{case_id}/review", json=payload, headers=admin_headers)

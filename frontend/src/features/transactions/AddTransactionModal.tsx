@@ -77,15 +77,33 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     }
   };
 
+  const formatCurrencyOnBlur = (val: string, setter: (v: string) => void) => {
+    const clean = val.replace(/,/g, '').trim();
+    if (!clean) return;
+    const num = parseFloat(clean);
+    if (!isNaN(num)) {
+      setter(num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    }
+  };
+
+  const unformatCurrencyOnFocus = (val: string, setter: (v: string) => void) => {
+    setter(val.replace(/,/g, ''));
+  };
+
+  const parseCleanFloat = (val: string): number => {
+    const clean = val.replace(/,/g, '').trim();
+    return parseFloat(clean) || 0;
+  };
+
   const validateForm = (): string | null => {
-    const amt = parseFloat(amount);
+    const amt = parseCleanFloat(amount);
     if (isNaN(amt) || amt <= 0) {
       return 'Transaction amount must be strictly greater than $0.00.';
     }
-    const oldO = parseFloat(oldBalanceOrg);
-    const newO = parseFloat(newBalanceOrig);
-    const oldD = parseFloat(oldBalanceDest);
-    const newD = parseFloat(newBalanceDest);
+    const oldO = parseCleanFloat(oldBalanceOrg);
+    const newO = parseCleanFloat(newBalanceOrig);
+    const oldD = parseCleanFloat(oldBalanceDest);
+    const newD = parseCleanFloat(newBalanceDest);
 
     if (isNaN(oldO) || oldO < 0 || isNaN(newO) || newO < 0) {
       return 'Origin balances cannot be negative.';
@@ -96,17 +114,27 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     if (!nameOrig.trim() || !nameDest.trim()) {
       return 'Both Origin and Destination account numbers are required.';
     }
-
-    if (['PAYMENT', 'TRANSFER', 'CASH_OUT', 'DEBIT'].includes(type)) {
-      if (newO > oldO) {
-        return `Impossible ledger: Origin balance cannot increase from $${oldO.toLocaleString()} to $${newO.toLocaleString()} on an outbound ${type}.`;
-      }
-    } else if (type === 'CASH_IN') {
-      if (newO < oldO) {
-        return `Impossible ledger: Origin balance cannot decrease on a CASH_IN transaction.`;
-      }
-    }
     return null;
+  };
+
+  const handleAutoFillBalances = () => {
+    const amt = parseCleanFloat(amount);
+    const oldO = parseCleanFloat(oldBalanceOrg);
+    if (['PAYMENT', 'TRANSFER', 'CASH_OUT', 'DEBIT'].includes(type)) {
+      const calcNewO = Math.max(0, oldO - amt);
+      setNewBalanceOrig(calcNewO.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    } else if (type === 'CASH_IN') {
+      const calcNewO = oldO + amt;
+      setNewBalanceOrig(calcNewO.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    }
+    if (nameDest.trim().startsWith('M')) {
+      setOldBalanceDest('0.00');
+      setNewBalanceDest('0.00');
+    } else {
+      const oldD = parseCleanFloat(oldBalanceDest);
+      const calcNewD = oldD + amt;
+      setNewBalanceDest(calcNewD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    }
   };
 
   const handleSubmit = async (andRunAgents: boolean = false) => {
@@ -122,13 +150,13 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
     const payload = {
       step: Number(step) || 1,
       type,
-      amount: parseFloat(amount),
+      amount: parseCleanFloat(amount),
       name_orig: nameOrig.trim(),
-      old_balance_org: parseFloat(oldBalanceOrg),
-      new_balance_orig: parseFloat(newBalanceOrig),
+      old_balance_org: parseCleanFloat(oldBalanceOrg),
+      new_balance_orig: parseCleanFloat(newBalanceOrig),
       name_dest: nameDest.trim(),
-      old_balance_dest: parseFloat(oldBalanceDest),
-      new_balance_dest: parseFloat(newBalanceDest),
+      old_balance_dest: parseCleanFloat(oldBalanceDest),
+      new_balance_dest: parseCleanFloat(newBalanceDest),
     };
 
     try {
@@ -203,11 +231,10 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 setActiveTab('form');
                 setErrorMsg(null);
               }}
-              className={`py-2.5 px-4 text-xs font-mono font-medium border-b-2 transition ${
-                activeTab === 'form'
+              className={`py-2.5 px-4 text-xs font-mono font-medium border-b-2 transition ${activeTab === 'form'
                   ? 'border-cyan-400 text-cyan-300'
                   : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
+                }`}
             >
               Manual Single Ingestion
             </button>
@@ -216,11 +243,10 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                 setActiveTab('csv');
                 setErrorMsg(null);
               }}
-              className={`py-2.5 px-4 text-xs font-mono font-medium border-b-2 transition flex items-center gap-1.5 ${
-                activeTab === 'csv'
+              className={`py-2.5 px-4 text-xs font-mono font-medium border-b-2 transition flex items-center gap-1.5 ${activeTab === 'csv'
                   ? 'border-cyan-400 text-cyan-300'
                   : 'border-transparent text-slate-400 hover:text-slate-200'
-              }`}
+                }`}
             >
               <FileSpreadsheet className="h-3.5 w-3.5" />
               Bulk CSV Upload (Admin)
@@ -257,6 +283,13 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                   >
                     Load: Fraud-Like Drain ($489k)
                   </button>
+                  <button
+                    type="button"
+                    onClick={handleAutoFillBalances}
+                    className="px-2.5 py-1 rounded bg-cyan-950/60 hover:bg-cyan-900/80 border border-cyan-700/60 text-cyan-300 text-[11px] font-mono transition cursor-pointer"
+                  >
+                    ⚡ Auto-fill balances from amount
+                  </button>
                 </div>
               </div>
 
@@ -284,11 +317,12 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     Amount ($ USD) *
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
+                    type="text"
+                    placeholder="0.00"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
+                    onFocus={() => unformatCurrencyOnFocus(amount, setAmount)}
+                    onBlur={() => formatCurrencyOnBlur(amount, setAmount)}
                     className="w-full bg-[#070b14] border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:border-cyan-400 focus:outline-none"
                   />
                 </div>
@@ -322,11 +356,12 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     Origin Old Balance *
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    type="text"
+                    placeholder="0.00"
                     value={oldBalanceOrg}
                     onChange={(e) => setOldBalanceOrg(e.target.value)}
+                    onFocus={() => unformatCurrencyOnFocus(oldBalanceOrg, setOldBalanceOrg)}
+                    onBlur={() => formatCurrencyOnBlur(oldBalanceOrg, setOldBalanceOrg)}
                     className="w-full bg-[#070b14] border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:border-cyan-400 focus:outline-none"
                   />
                 </div>
@@ -336,11 +371,12 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     Origin New Balance *
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    type="text"
+                    placeholder="0.00"
                     value={newBalanceOrig}
                     onChange={(e) => setNewBalanceOrig(e.target.value)}
+                    onFocus={() => unformatCurrencyOnFocus(newBalanceOrig, setNewBalanceOrig)}
+                    onBlur={() => formatCurrencyOnBlur(newBalanceOrig, setNewBalanceOrig)}
                     className="w-full bg-[#070b14] border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:border-cyan-400 focus:outline-none"
                   />
                 </div>
@@ -350,11 +386,12 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     Destination Old Balance
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    type="text"
+                    placeholder="0.00"
                     value={oldBalanceDest}
                     onChange={(e) => setOldBalanceDest(e.target.value)}
+                    onFocus={() => unformatCurrencyOnFocus(oldBalanceDest, setOldBalanceDest)}
+                    onBlur={() => formatCurrencyOnBlur(oldBalanceDest, setOldBalanceDest)}
                     className="w-full bg-[#070b14] border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:border-cyan-400 focus:outline-none"
                   />
                 </div>
@@ -364,15 +401,58 @@ export const AddTransactionModal: React.FC<AddTransactionModalProps> = ({
                     Destination New Balance
                   </label>
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    type="text"
+                    placeholder="0.00"
                     value={newBalanceDest}
                     onChange={(e) => setNewBalanceDest(e.target.value)}
+                    onFocus={() => unformatCurrencyOnFocus(newBalanceDest, setNewBalanceDest)}
+                    onBlur={() => formatCurrencyOnBlur(newBalanceDest, setNewBalanceDest)}
                     className="w-full bg-[#070b14] border border-slate-700 rounded-lg px-3 py-2 text-white font-mono focus:border-cyan-400 focus:outline-none"
                   />
                 </div>
               </div>
+
+              {/* Live Ledger Warnings & Reconciliation Feedback */}
+              {(() => {
+                const numAmt = parseCleanFloat(amount);
+                const numOldO = parseCleanFloat(oldBalanceOrg);
+                const numNewO = parseCleanFloat(newBalanceOrig);
+                const numOldD = parseCleanFloat(oldBalanceDest);
+                const numNewD = parseCleanFloat(newBalanceDest);
+                const actualOrigChange = numNewO - numOldO;
+                const expectedOrigChange = ['TRANSFER', 'CASH_OUT', 'PAYMENT', 'DEBIT'].includes(type) ? -numAmt : numAmt;
+                const hasOrigDiscrepancy = numAmt > 0 && Math.abs(actualOrigChange - expectedOrigChange) > 1.0;
+                const isMerchant = nameDest.trim().startsWith('M');
+                const hasMerchantDiscrepancy = isMerchant && (numOldD > 0 || numNewD > 0);
+
+                if (!hasOrigDiscrepancy && !hasMerchantDiscrepancy) return null;
+
+                return (
+                  <div className="space-y-2 pt-1">
+                    {hasOrigDiscrepancy && (
+                      <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-700/60 text-amber-300 text-xs font-mono space-y-1">
+                        <div className="flex items-center gap-2 font-semibold">
+                          <AlertCircle className="h-4 w-4 text-amber-400 shrink-0" />
+                          <span>
+                            Origin balance change ({actualOrigChange >= 0 ? `+${actualOrigChange.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : actualOrigChange.toLocaleString(undefined, { minimumFractionDigits: 2 })}) does not match amount ({numAmt.toLocaleString(undefined, { minimumFractionDigits: 2 })}).
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-amber-300/80 pl-6 font-sans">
+                          This transaction has ledger inconsistencies and will be escalated to 4-Eyes forensic review. Saving is allowed.
+                        </div>
+                      </div>
+                    )}
+                    {hasMerchantDiscrepancy && (
+                      <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-700/60 text-amber-300 text-xs font-mono flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-amber-400 shrink-0" />
+                        <span>
+                          Destination account ({nameDest}) is a merchant terminal ("M") with impossible nonzero balance.
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               <div className="text-[10px] font-mono text-slate-500 pt-1">
                 * Note: Evaluated without target label leakage. Ground-truth dataset label is assigned as NULL (unknown) for real production transactions.

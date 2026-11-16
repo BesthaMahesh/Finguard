@@ -12,10 +12,31 @@ def get_executive_summary(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
-    total_txs = db.query(Transaction).count()
-    flagged_review = db.query(Transaction).filter(Transaction.risk_score >= 65.0).count()
-    historical_frauds = db.query(Transaction).filter(Transaction.is_fraud == 1).count()
-    open_cases = db.query(InvestigationCase).filter(InvestigationCase.status == "OPEN").count()
+    historical_count = db.query(Transaction).filter(
+        (Transaction.source == "seed") | (Transaction.id <= 12000)
+    ).count()
+    live_count = db.query(Transaction).filter(
+        Transaction.id > 12000,
+        Transaction.is_test == False
+    ).count()
+    total_txs = historical_count + live_count
+
+    # High-Risk Transactions (Model & Rule inference operational priority >= HIGH)
+    flagged_review = db.query(Transaction).filter(
+        Transaction.is_test == False,
+        (Transaction.risk_score >= 65.0) | (Transaction.risk_level.in_(["HIGH", "CRITICAL"]))
+    ).count()
+
+    # Historical Verified Frauds (Strictly historical dataset evaluation label)
+    historical_frauds = db.query(Transaction).filter(
+        (Transaction.source == "seed") | (Transaction.id <= 12000),
+        Transaction.is_fraud == 1
+    ).count()
+
+    open_cases = db.query(InvestigationCase).filter(
+        InvestigationCase.status == "OPEN",
+        InvestigationCase.is_test == False
+    ).count()
     audit_events_count = db.query(AuditEvent).count()
 
     # Risk level distribution
@@ -59,6 +80,8 @@ def get_executive_summary(
 
     return {
         "total_transactions_processed": total_txs,
+        "historical_transactions_count": historical_count,
+        "live_entered_transactions_count": live_count,
         "transactions_flagged_for_review": flagged_review,
         "historical_dataset_fraud_count": historical_frauds,
         "historical_fraud_rate_pct": round((historical_frauds / max(1, total_txs)) * 100, 3),

@@ -60,8 +60,12 @@ def test_add_transaction_impossible_ledger_rejected(auth_headers):
         "new_balance_dest": 500.0
     }
     response = client.post("/api/v1/transactions", json=payload, headers=auth_headers)
-    assert response.status_code == 422
-    assert "ledger discrepancy" in response.text.lower()
+    # Item A: Saving is allowed so fraudulent/discrepant transactions can be ingested and escalated
+    assert response.status_code == 201
+    data = response.json()
+    assert len(data.get("warnings", [])) > 0
+    assert any("ledger" in w.lower() or "variance" in w.lower() for w in data["warnings"])
+    assert data["case_id"] is not None
 
 def test_high_risk_auto_case_creation(auth_headers):
     """

@@ -49,15 +49,15 @@ def test_pdf_loader_error_handling():
         os.remove(empty_path)
 
 def test_markdown_loader_with_frontmatter():
-    sample_md = os.path.join("knowledge_base", "internal_policies", "sample_transaction_fraud_investigation_procedure.md")
+    sample_md = os.path.join("knowledge_base", "internal_policies", "GOV-AI-2024-09.md")
     if not os.path.exists(sample_md):
         pytest.skip("sample policy not found")
 
     res = MarkdownLoader.load_markdown(sample_md)
-    assert "Transaction Fraud Investigation Procedure" in res["title"]
-    assert res["frontmatter"].get("category") == "fraud_patterns"
+    assert "FinGuard Enterprise Model Governance" in res["title"]
+    assert res["frontmatter"].get("category") == "internal_policies"
     assert res["frontmatter"].get("source_type") == "sample_internal_policy"
-    assert len(res["sections"]) >= 4
+    assert len(res["sections"]) >= 2
 
 def test_discovery_and_hashing():
     discovered = discover_documents(["./knowledge_base"])

@@ -44,6 +44,10 @@ export const SystemAdmin: React.FC<SystemAdminProps> = ({ currentUser }) => {
   const [resetLoading, setResetLoading] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<{ message: string; isError?: boolean } | null>(null);
 
+  // Demo Data Reset State
+  const [resetDemoModalOpen, setResetDemoModalOpen] = useState(false);
+  const [resetDemoLoading, setResetDemoLoading] = useState(false);
+
   // MCP Interactive Runner State
   const [mcpData, setMcpData] = useState<{ server: string; protocol: string; tools: any[] } | null>(null);
   const [selectedTool, setSelectedTool] = useState('lookup_transaction');
@@ -136,6 +140,21 @@ export const SystemAdmin: React.FC<SystemAdminProps> = ({ currentUser }) => {
       setActionFeedback({ message: err.message || 'Failed to reset password.', isError: true });
     } finally {
       setResetLoading(false);
+    }
+  };
+
+  const handleResetDemoData = async () => {
+    try {
+      setResetDemoLoading(true);
+      const res = await api.resetDemoData();
+      setActionFeedback({
+        message: res.message || 'Demo data restored successfully to 12,000 historical records and 25 verified investigation cases.',
+      });
+      setResetDemoModalOpen(false);
+    } catch (err: any) {
+      setActionFeedback({ message: err.message || 'Failed to reset demo data.', isError: true });
+    } finally {
+      setResetDemoLoading(false);
     }
   };
 
@@ -540,8 +559,38 @@ export const SystemAdmin: React.FC<SystemAdminProps> = ({ currentUser }) => {
               Active in inference pipeline
             </div>
           </div>
+
+          <div className="p-4 rounded-xl bg-[#11192e] border border-amber-800/60 md:col-span-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-sm">
+                <RefreshCw className="h-4 w-4" />
+                Demo & Evaluation Dataset Reset
+              </div>
+              <div className="text-[11px] text-slate-300 font-sans max-w-2xl leading-relaxed">
+                Purges ad-hoc test transactions and extra test cases. Restores exactly the canonical 12,000 historical PaySim dataset, 25 verified investigation cases, and re-seals the cryptographic SHA-256 audit chain.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setResetDemoModalOpen(true)}
+              className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-mono text-xs font-semibold shadow-lg shadow-amber-950/40 transition cursor-pointer shrink-0"
+            >
+              Reset Demo Data
+            </button>
+          </div>
         </div>
       )}
+
+      {/* Confirmation Dialog for Demo Data Reset */}
+      <ConfirmActionDialog
+        isOpen={resetDemoModalOpen}
+        title="Reset Platform Demo Data?"
+        message="This action will delete all user-entered test transactions and extra test cases created during evaluation, restoring the clean 12,000-transaction seeded dataset and re-sealing the SHA-256 audit ledger."
+        confirmLabel={resetDemoLoading ? "Resetting..." : "Reset Demo Data"}
+        isDestructive={true}
+        onConfirm={handleResetDemoData}
+        onCancel={() => setResetDemoModalOpen(false)}
+      />
 
       {/* Confirmation Dialog for Status Change */}
       <ConfirmActionDialog

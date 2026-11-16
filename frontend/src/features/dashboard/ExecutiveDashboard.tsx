@@ -207,7 +207,11 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ onNaviga
         <MetricCard
           label={isAdmin ? 'Transactions Analyzed' : 'Total Transactions Processed'}
           value={summary.total_transactions_processed.toLocaleString()}
-          explanation={isAdmin ? 'Verified financial transactions processed through detection pipeline' : 'Verified financial transactions in active financial ledger'}
+          explanation={
+            summary.live_entered_transactions_count && summary.live_entered_transactions_count > 0
+              ? `${(summary.historical_transactions_count || 12000).toLocaleString()} historical + ${summary.live_entered_transactions_count.toLocaleString()} live-entered`
+              : '12,000 historical + 0 live-entered'
+          }
           icon={<TrendingUp className="h-4 w-4 text-sky-400" />}
           variant="default"
         />

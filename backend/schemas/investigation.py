@@ -13,7 +13,7 @@ class InvestigationReviewRequest(BaseModel):
         ...,
         pattern="^(ESCALATE_TO_SAR|FREEZE_ACCOUNT|CONFIRMED_FRAUD_FREEZE|REQUEST_ADDITIONAL_KYC|REQUEST_ADDITIONAL_EVIDENCE|DISMISS_FALSE_POSITIVE|APPROVE_FALSE_POSITIVE)$"
     )
-    disposition_notes: str = Field(..., min_length=5)
+    disposition_notes: str = Field(..., min_length=30, description="Minimum 30 characters detailing verified factual rationale")
 
     @field_validator("disposition", mode="before")
     @classmethod
@@ -42,6 +42,7 @@ class InvestigationCaseResponse(BaseModel):
     agent_workflow_trace_json: Optional[str] = None
     disposition: Optional[str] = None
     disposition_notes: Optional[str] = None
+    submitted_by: Optional[str] = None
     reviewed_by: Optional[str] = None
     reviewed_at: Optional[datetime] = None
     created_at: datetime

@@ -83,6 +83,9 @@ export interface PolicyCitation {
   document_id: string;
   document_title: string;
   section: string;
+  version?: string;
+  page_number?: number | string | null;
+  chunk_id?: string;
   source_file?: string;
   excerpt: string;
   relevance_score: number;
@@ -111,6 +114,7 @@ export interface InvestigationCase {
   agent_workflow_trace_json?: string;
   disposition?: string;
   disposition_notes?: string;
+  submitted_by?: string;
   reviewed_by?: string;
   reviewed_at?: string;
   created_at: string;
@@ -118,6 +122,8 @@ export interface InvestigationCase {
 
 export interface DashboardSummary {
   total_transactions_processed: number;
+  historical_transactions_count?: number;
+  live_entered_transactions_count?: number;
   transactions_flagged_for_review: number;
   historical_dataset_fraud_count: number;
   historical_fraud_rate_pct: number;

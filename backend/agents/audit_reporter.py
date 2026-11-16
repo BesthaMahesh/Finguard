@@ -18,6 +18,7 @@ from backend.agents.agent_state import InvestigationState, AgentTimelineStep
 from backend.db.session import SessionLocal
 from backend.db.models import AuditEvent, generate_uuid
 from backend.security.pii_protection import pii_protector
+from backend.core.decision_policy import evaluate_decision_policy
 
 def audit_reporting_agent(state: InvestigationState) -> InvestigationState:
     """
@@ -92,18 +93,24 @@ def audit_reporting_agent(state: InvestigationState) -> InvestigationState:
         )
     }
 
-    # 6. Human Review Decision Requirements
-    requires_human_review = state.get("requires_human_review", False)
-    if risk.get("composite_risk_score", 0) >= 70.0 or not citations:
-        requires_human_review = True
+    # 6. Human Review Decision Requirements (Single Source of Truth)
+    dq_flags = state.get("data_quality_report", {}).get("flags", [])
+    rule_ids = [r.get("rule_id", "") for r in model_pred.get("rule_flags", []) if isinstance(r, dict)]
+    comp_score = float(risk.get("composite_risk_score", 0.0))
+    policy_verdict = evaluate_decision_policy(
+        risk_score=comp_score,
+        rule_flags=rule_ids,
+        data_quality_flags=dq_flags,
+        transaction=tx
+    )
+    requires_human_review = policy_verdict.requires_human_review
 
     human_decision_status = {
-        "requires_human_review": requires_human_review,
-        "review_checkpoint_reason": state.get("review_checkpoint_reason") or (
-            "High composite risk score exceeding operational threshold" if risk.get("composite_risk_score", 0) >= 70.0 else None
-        ),
-        "assigned_role_required": "INVESTIGATOR",
-        "action_allowed_without_approval": "READ_ONLY_TRIAGE"
+        "requires_human_review": policy_verdict.requires_human_review,
+        "decision": policy_verdict.decision,
+        "review_checkpoint_reason": policy_verdict.summary_reason if policy_verdict.requires_human_review else None,
+        "assigned_role_required": "INVESTIGATOR" if policy_verdict.requires_human_review else "SYSTEM_AUTO",
+        "action_allowed_without_approval": "AUTO_CLEARED" if not policy_verdict.requires_human_review else "READ_ONLY_TRIAGE"
     }
 
     report = {

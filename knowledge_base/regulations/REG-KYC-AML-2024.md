@@ -1,3 +1,14 @@
+---
+document_id: REG-KYC-AML-2024
+title: "Regulatory Direction: KYC & AML Standards (RBI & International Baselines)"
+version: "4.0"
+effective_date: "2024-01-01"
+category: regulations
+source_type: official_regulation
+jurisdiction: RBI_GLOBAL
+approval_status: APPROVED
+---
+
 # Regulatory Direction: KYC & AML Standards (RBI & International Baselines)
 Document ID: REG-KYC-AML-2024
 Version: 4.0

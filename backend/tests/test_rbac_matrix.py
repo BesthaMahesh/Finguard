@@ -22,7 +22,7 @@ def test_analyst_role_permissions():
     # Forbidden: submit review disposition
     review_resp = client.post(
         "/api/v1/investigations/CASE-FG-000199/review",
-        json={"disposition": "ESCALATE_TO_SAR", "disposition_notes": "Analyst test notes"},
+        json={"disposition": "ESCALATE_TO_SAR", "disposition_notes": "Analyst test notes for role validation check."},
         headers=headers
     )
     assert review_resp.status_code == 403
@@ -72,7 +72,7 @@ def test_auditor_role_permissions():
     # Forbidden: submit investigator disposition
     review_resp = client.post(
         "/api/v1/investigations/CASE-FG-000199/review",
-        json={"disposition": "ESCALATE_TO_SAR", "disposition_notes": "Auditor attempt to edit case"},
+        json={"disposition": "ESCALATE_TO_SAR", "disposition_notes": "Auditor attempt to edit case under protocol."},
         headers=headers
     )
     assert review_resp.status_code == 403

@@ -55,6 +55,16 @@ def test_presidio_redact_financial_accounts():
     assert "C1234567890" not in redacted
     assert "C123***890" in redacted or "<FINANCIAL_ACCOUNT>" in redacted
 
+def test_presidio_no_false_positive_swift_bic():
+    """Verify common banking keywords are never erroneously redacted as SWIFT_BIC."""
+    text = "The transaction exceeded institutions threshold during payment settlement."
+    redacted = pii_protector.redact_pii(text)
+    assert "<SWIFT_BIC>" not in redacted
+    assert "transaction" in redacted.lower()
+    assert "institutions" in redacted.lower()
+    assert "threshold" in redacted.lower()
+    assert "payment" in redacted.lower()
+
 def test_vault_unmasking_access_control():
     text = "Account C1092837465 is under forensic review."
     redacted = pii_protector.redact_pii(text, preserve_in_vault=True)

@@ -445,13 +445,14 @@ class PolicyRetriever:
             "3. For every factual claim, cite the exact source document, filename, version, and page number or section (e.g. '[fattdata.pdf, Page 14, v1.0]').\n"
             "4. Clearly distinguish official regulatory standards (such as FATF Recommendations or RBI Master Directions) from sample internal policies or research papers.\n"
             "5. If the retrieved sources do not provide sufficient facts to answer the question completely, explicitly identify what information is missing. Never fabricate facts, dates, or regulations.\n"
-            "6. Never invent sources or URLs."
+            "6. Never invent sources or URLs.\n"
+            "7. Keep your response concise (maximum ~180 words), focused directly on answering the query."
         )
 
         user_prompt = (
             f"Question: {query}\n\n"
             f"Retrieved Source Evidence:\n{context_str}\n\n"
-            "Provide an executive, verifiable synthesis with precise source citations:"
+            "Provide an executive, concise synthesis (under 180 words) with precise source citations:"
         )
 
         # Redact any accidental PII before dispatching to external model

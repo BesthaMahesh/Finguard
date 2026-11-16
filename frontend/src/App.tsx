@@ -67,6 +67,24 @@ export function App() {
     }
   }, [isAuthenticated, currentTab]);
 
+  // Synchronize document.title dynamically on tab change
+  useEffect(() => {
+    const tabTitles: Record<string, string> = {
+      overview: 'Risk Dashboard',
+      transactions: 'Transaction Intelligence',
+      agents: 'Risk Analysis Workflow',
+      investigations: 'Case Investigations',
+      assistant: 'FinGuard Assistant',
+      knowledge: 'Policies & Knowledge Base',
+      models: 'Model Intelligence',
+      audit: 'Governance & Audit',
+      observability: 'Observability Center',
+      admin: 'System Admin',
+    };
+    const titleName = tabTitles[currentTab] || 'Risk Intelligence';
+    document.title = `FinGuard | ${titleName}`;
+  }, [currentTab]);
+
   // Check existing session token on application mount
   useEffect(() => {
     checkActiveSession();
@@ -220,7 +238,11 @@ export function App() {
             )}
 
             {currentTab === 'investigations' && (
-              <InvestigationWorkbench userRole={userRole} initialTxId={workbenchTxId} />
+              <InvestigationWorkbench
+                userRole={userRole}
+                initialTxId={workbenchTxId}
+                currentUsername={user?.username}
+              />
             )}
 
             {currentTab === 'assistant' && (

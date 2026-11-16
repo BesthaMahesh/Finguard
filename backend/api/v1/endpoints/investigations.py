@@ -1,6 +1,7 @@
 from typing import Optional
 import json
-from datetime import datetime
+import hashlib
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -120,14 +121,30 @@ def submit_investigation_review(
     if not case:
         raise HTTPException(status_code=404, detail=f"Investigation case '{investigation_id}' not found.")
 
+    # 4-Eyes Principle: Submitter cannot approve their own case disposition
+    submitter = getattr(case, "submitted_by", None)
+    current_username = current_user.get("username")
+    if submitter and submitter == current_username:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"4-Eyes Policy Violation: You submitted transaction #{case.transaction_id} as '{submitter}' and cannot approve its disposition. A second authorized investigator or administrator must perform this review."
+        )
+
+    # Minimum length validation on disposition findings
+    if not req.disposition_notes or len(req.disposition_notes.strip()) < 30:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Investigator findings and notes must be at least 30 characters in length and document verified rationale."
+        )
+
     # Idempotent re-submission check: if identical disposition was already recorded, return safely
     if case.disposition == req.disposition and case.disposition_notes == req.disposition_notes:
         return InvestigationCaseResponse.model_validate(case)
 
     case.disposition = req.disposition
     case.disposition_notes = req.disposition_notes
-    case.reviewed_by = current_user["username"]
-    case.reviewed_at = datetime.utcnow()
+    case.reviewed_by = current_username
+    case.reviewed_at = datetime.now(timezone.utc)
     case.status = "CLOSED_RESOLVED" if req.disposition != "DISMISS_FALSE_POSITIVE" else "CLOSED_FALSE_POSITIVE"
 
     if case.transaction:
@@ -138,22 +155,35 @@ def submit_investigation_review(
         elif req.disposition == "REQUEST_ADDITIONAL_KYC":
             case.transaction.status = "UNDER_INVESTIGATION"
 
-    # Audit log entry for human-in-the-loop review
+    # Chained AuditEvent for 4-Eyes disposition review
+    prev_ev = db.query(AuditEvent).order_by(AuditEvent.timestamp.desc()).first()
+    prev_hash = prev_ev.event_hash if (prev_ev and prev_ev.event_hash) else "GENESIS_ROOT_HASH_00000000"
+    now_utc = datetime.now(timezone.utc)
+    corr_id = generate_uuid()
+    action_name = "INVESTIGATION_HUMAN_REVIEW_DISPOSITION"
+    event_raw = f"{corr_id}:{action_name}:{case.case_number}:{prev_hash}:{now_utc.isoformat()}"
+    curr_hash = hashlib.sha256(event_raw.encode("utf-8")).hexdigest()
+
     audit = AuditEvent(
-        correlation_id=generate_uuid(),
-        actor_id=current_user["username"],
+        correlation_id=corr_id,
+        actor_id=current_username,
         actor_role=current_user["role"],
-        action="INVESTIGATION_HUMAN_REVIEW_DISPOSITION",
+        action=action_name,
         target_type="INVESTIGATION_CASE",
         target_id=case.case_number,
         outcome="SUCCESS",
+        event_hash=curr_hash,
+        previous_hash=prev_hash,
+        timestamp=now_utc,
         details_json=json.dumps({
             "disposition": req.disposition,
             "notes": req.disposition_notes,
             "case_id": case.id,
             "transaction_id": case.transaction_id,
-            "reviewed_by": current_user["username"],
-            "reviewed_at": datetime.utcnow().isoformat()
+            "submitted_by": submitter,
+            "reviewed_by": current_username,
+            "four_eyes_verified": True,
+            "reviewed_at": now_utc.isoformat()
         })
     )
     db.add(audit)

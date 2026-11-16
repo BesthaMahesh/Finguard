@@ -159,6 +159,19 @@ class KnowledgeIngestionPipeline:
             if file_type == "PDF":
                 pdf_data = PDFLoader.load_pdf(file_path)
                 doc_title = pdf_data["title"]
+                lower_fn = file_name.lower()
+                if "fattdata" in lower_fn:
+                    doc_title = "FATF 40 Recommendations"
+                    category = "AML/Sanctions"
+                    source_type = "official_regulation"
+                elif "frauddata" in lower_fn:
+                    doc_title = "RBI Master Direction – Know Your Customer (KYC) Direction, 2016"
+                    category = "regulations"
+                    source_type = "official_regulation"
+                elif "ftfe2" in lower_fn:
+                    doc_title = "FATF Guidance: Beneficial Ownership of Legal Arrangements"
+                    category = "research"
+                    source_type = "research"
                 page_count = pdf_data["total_pages"]
                 char_count = pdf_data["total_characters"]
                 chunks = self.chunker.chunk_pdf_pages(

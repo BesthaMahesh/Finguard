@@ -46,6 +46,8 @@ class Transaction(Base):
     risk_level = Column(String(20), default="LOW")  # LOW, MEDIUM, HIGH, CRITICAL
     status = Column(String(30), default="UNREVIEWED")  # UNREVIEWED, UNDER_INVESTIGATION, CLEARED, ESCALATED, CONFIRMED_FRAUD
     rule_flags = Column(Text, nullable=True)  # JSON list of triggered rule IDs
+    source = Column(String(30), default="seed")  # seed | user_entered | test | csv_import
+    is_test = Column(Boolean, default=False)
     created_at = Column(DateTime, default=utc_now)
 
     investigation_cases = relationship("InvestigationCase", back_populates="transaction")
@@ -72,7 +74,10 @@ class InvestigationCase(Base):
     agent_workflow_trace_json = Column(Text, nullable=True)
     disposition = Column(String(50), nullable=True)  # ESCALATE_TO_SAR, FREEZE_ACCOUNT, REQUEST_ADDITIONAL_KYC, DISMISS_FALSE_POSITIVE
     disposition_notes = Column(Text, nullable=True)
-    reviewed_by = Column(String(50), nullable=True)
+    submitted_by = Column(String(50), nullable=True)  # User who ran/submitted the transaction (4-Eyes separation)
+    reviewed_by = Column(String(50), nullable=True)   # Secondary authorized investigator/admin who approved disposition
+    source = Column(String(30), default="seed")       # seed | user_entered | test | csv_import
+    is_test = Column(Boolean, default=False)
     reviewed_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)

@@ -31,6 +31,7 @@ ALLOWED_UPLOAD_CATEGORIES = {
 
 @router.get("/status")
 def get_knowledge_status(
+    db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user)
 ):
     """
@@ -39,6 +40,22 @@ def get_knowledge_status(
     check_permission(current_user["role"], "search_policies")
     manifest_mgr = ManifestManager()
     stats = manifest_mgr.get_summary_statistics()
+
+    # Recalculate accurate stats directly from KnowledgeDocument database & Chroma
+    docs = db.query(KnowledgeDocument).all()
+    if docs:
+        stats["total_indexed"] = len(docs)
+        stats["total_discovered"] = len(docs)
+        stats["total_chunks"] = sum(d.chunk_count or 0 for d in docs)
+        try:
+            from backend.rag.chroma_client import get_knowledge_collection
+            coll = get_knowledge_collection()
+            chroma_count = coll.count()
+            if chroma_count > 0:
+                stats["total_chunks"] = chroma_count
+        except Exception:
+            pass
+
     return {
         "status": "HEALTHY",
         "chroma_collection": "finguard_policies_and_typologies",
