@@ -12,8 +12,12 @@ _CACHED_ST_MODELS = {}
 
 def get_cached_sentence_transformer(model_name: str = "all-MiniLM-L6-v2"):
     global _CACHED_ST_MODELS
-    # On Render or cloud environments with restricted memory/bandwidth, default to fast deterministic embeddings
-    is_cloud = bool(os.environ.get("RENDER")) or os.environ.get("ENVIRONMENT", "").lower() == "production"
+    # On Render, CI, or test environments, default to fast deterministic embeddings
+    is_cloud = (
+        bool(os.environ.get("RENDER"))
+        or bool(os.environ.get("CI"))
+        or os.environ.get("ENVIRONMENT", "").lower() in ("production", "test")
+    )
     default_mode = "true" if is_cloud else "false"
     if os.environ.get("USE_LIGHTWEIGHT_EMBEDDINGS", default_mode).lower() in ("true", "1", "yes"):
         _CACHED_ST_MODELS[model_name] = None
@@ -67,12 +71,13 @@ class FinGuardEmbeddingFunction(EmbeddingFunction):
         return self.embed_documents([str(text)])[0]
 
     def _hash_embed(self, text: str, dim: int = 384) -> List[float]:
+        import hashlib
         vec = np.zeros(dim, dtype=np.float32)
         words = text.lower().split()
         if not words:
             return vec.tolist()
         for w in words:
-            h = hash(w) % dim
+            h = int(hashlib.md5(w.encode("utf-8")).hexdigest(), 16) % dim
             vec[h] += 1.0
         norm = np.linalg.norm(vec)
         if norm > 0:

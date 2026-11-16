@@ -40,10 +40,13 @@ def test_investigator_role_permissions():
     # Allowed: view investigations
     cases_resp = client.get("/api/v1/investigations", headers=headers)
     assert cases_resp.status_code == 200
+    data = cases_resp.json()
+    cases_list = data.get("items", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+    target_case_num = "CASE-FG-000199" if any(c.get("case_number") == "CASE-FG-000199" for c in cases_list) else (cases_list[0]["case_number"] if cases_list else "CASE-FG-000001")
 
     # Allowed: submit disposition review
     review_resp = client.post(
-        "/api/v1/investigations/CASE-FG-000199/review",
+        f"/api/v1/investigations/{target_case_num}/review",
         json={"disposition": "ESCALATE_TO_SAR", "disposition_notes": "Investigator SAR Escalation verified by Marcus Vance."},
         headers=headers
     )

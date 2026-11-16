@@ -1,8 +1,10 @@
 import uuid
 import json
 import time
+import hashlib
+import logging
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.orm import Session
@@ -26,6 +28,7 @@ from backend.security.jwt_auth import (
 )
 
 router = APIRouter(prefix="/auth", tags=["Authentication & Access Control"])
+logger = logging.getLogger(__name__)
 
 # In-memory sliding window rate limiter for login attempts (5 attempts / 60 seconds per identifier)
 _login_failed_attempts = defaultdict(list)
@@ -81,8 +84,8 @@ def _record_audit_log(
         db.add(ev)
         db.commit()
     except Exception as e:
+        logger.error(f"Failed to record audit log: {e}", exc_info=True)
         db.rollback()
-        # Non-fatal log failure
 
 @router.post("/token", response_model=TokenResponse)
 def login_for_access_token(

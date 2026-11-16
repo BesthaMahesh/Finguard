@@ -82,6 +82,48 @@ def initialize_test_suite():
                 db.add(c)
             db.commit()
 
+        # 4b. Ensure CASE-FG-000199 exists for RBAC matrix validation
+        c199 = db.query(InvestigationCase).filter_by(case_number="CASE-FG-000199").first()
+        if not c199:
+            tx199 = db.query(Transaction).filter_by(id=199).first()
+            if not tx199:
+                tx199 = Transaction(
+                    id=199,
+                    step=1,
+                    type="TRANSFER",
+                    amount=500000.0,
+                    name_orig="C19900001",
+                    old_balance_org=500000.0,
+                    new_balance_orig=0.0,
+                    name_dest="C19900002",
+                    old_balance_dest=0.0,
+                    new_balance_dest=500000.0,
+                    is_fraud=1,
+                    risk_score=98.0,
+                    risk_level="CRITICAL",
+                    status="UNDER_INVESTIGATION",
+                    source="seed",
+                    is_test=False
+                )
+                db.add(tx199)
+                db.commit()
+            c199 = InvestigationCase(
+                id="CASE-FG-000199",
+                case_number="CASE-FG-000199",
+                transaction_id=199,
+                title="Review: Transaction #199",
+                status="OPEN",
+                priority="CRITICAL",
+                assigned_to="Financial Crime Unit (AI Triage)",
+                risk_score=98.0,
+                summary="Critical fraud alert for test case #199",
+                submitted_by="system",
+                is_test=False,
+                source="seed"
+            )
+            db.add(c199)
+            db.commit()
+
         # 5. Register model governance metadata
         meta_count = db.query(ModelMetadata).count()
         if meta_count == 0:
