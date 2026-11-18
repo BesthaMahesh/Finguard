@@ -83,43 +83,120 @@ def list_knowledge_documents(
         query = query.filter(KnowledgeDocument.category == category)
     docs = query.all()
 
-    items = []
-    for d in docs:
-        manifest_meta = all_manifest_docs.get(d.doc_id, {})
-        if not manifest_meta and d.metadata_json:
+    # Self-healing fallback: If DB table is empty but manifest has indexed documents, auto-sync and serve
+    if not docs and all_manifest_docs:
+        for m_id, m_doc in all_manifest_docs.items():
+            if m_doc.get("status") == "FAILED":
+                continue
+            doc_cat = m_doc.get("category", "regulations")
+            if category and category.lower() != "all" and doc_cat.lower() != category.lower():
+                continue
+            doc_title = m_doc.get("document_title") or m_doc.get("title") or m_id
+            fname = m_doc.get("file_name", m_id)
+            if search:
+                s_low = search.lower()
+                if s_low not in doc_title.lower() and s_low not in fname.lower():
+                    continue
+
             try:
-                manifest_meta = json.loads(d.metadata_json)
+                existing = db.query(KnowledgeDocument).filter_by(doc_id=m_id).first()
+                if not existing:
+                    new_kdoc = KnowledgeDocument(
+                        doc_id=m_id,
+                        title=doc_title,
+                        category=doc_cat,
+                        version=m_doc.get("version", "1.0"),
+                        status=m_doc.get("status", "INDEXED"),
+                        effective_from=m_doc.get("effective_from"),
+                        effective_to=m_doc.get("effective_to"),
+                        jurisdiction=m_doc.get("jurisdiction", "GLOBAL"),
+                        approval_status=m_doc.get("approval_status", "APPROVED"),
+                        content_hash=m_doc.get("content_hash"),
+                        document_access_scope=m_doc.get("document_access_scope", "ALL"),
+                        chunk_count=m_doc.get("chunk_count") or m_doc.get("total_chunks", 1),
+                        metadata_json=json.dumps(m_doc)
+                    )
+                    db.add(new_kdoc)
+                    db.commit()
             except Exception:
-                manifest_meta = {}
+                db.rollback()
 
-        ftype = manifest_meta.get("file_type", "MD")
-        if file_type and file_type.lower() != "all" and ftype.upper() != file_type.upper():
-            continue
+        # Re-fetch after sync
+        docs = query.all()
 
-        title_val = d.title
-        fname_val = manifest_meta.get("file_name", d.doc_id)
-        if search:
-            s_low = search.lower()
-            if s_low not in title_val.lower() and s_low not in fname_val.lower():
+    items = []
+    if docs:
+        for d in docs:
+            manifest_meta = all_manifest_docs.get(d.doc_id, {})
+            if not manifest_meta and d.metadata_json:
+                try:
+                    manifest_meta = json.loads(d.metadata_json)
+                except Exception:
+                    manifest_meta = {}
+
+            ftype = manifest_meta.get("file_type", "MD")
+            if file_type and file_type.lower() != "all" and ftype.upper() != file_type.upper():
                 continue
 
-        items.append({
-            "id": d.id,
-            "doc_id": d.doc_id,
-            "title": title_val,
-            "category": d.category,
-            "version": d.version,
-            "chunk_count": d.chunk_count,
-            "page_count": manifest_meta.get("page_count", 1),
-            "character_count": manifest_meta.get("character_count", len(d.content or "")),
-            "file_name": fname_val,
-            "file_type": ftype,
-            "file_size_bytes": manifest_meta.get("file_size_bytes", 0),
-            "source_type": manifest_meta.get("source_type", "official_regulation"),
-            "content_hash": manifest_meta.get("content_hash"),
-            "status": manifest_meta.get("status", "INDEXED"),
-            "ingested_at": d.ingested_at.isoformat() if d.ingested_at else None
-        })
+            title_val = d.title or manifest_meta.get("document_title") or d.doc_id
+            fname_val = manifest_meta.get("file_name", d.doc_id)
+            if search:
+                s_low = search.lower()
+                if s_low not in title_val.lower() and s_low not in fname_val.lower():
+                    continue
+
+            items.append({
+                "id": d.id,
+                "doc_id": d.doc_id,
+                "title": title_val,
+                "category": d.category,
+                "version": d.version,
+                "chunk_count": d.chunk_count,
+                "page_count": manifest_meta.get("page_count", 1),
+                "character_count": manifest_meta.get("character_count", len(d.content or "")),
+                "file_name": fname_val,
+                "file_type": ftype,
+                "file_size_bytes": manifest_meta.get("file_size_bytes", 0),
+                "source_type": manifest_meta.get("source_type", "official_regulation"),
+                "content_hash": manifest_meta.get("content_hash"),
+                "status": manifest_meta.get("status", "INDEXED"),
+                "ingested_at": d.ingested_at.isoformat() if d.ingested_at else None
+            })
+    elif all_manifest_docs:
+        # Fallback to direct manifest data if database is empty/unseeded
+        for m_id, m_doc in all_manifest_docs.items():
+            if m_doc.get("status") == "FAILED":
+                continue
+            doc_cat = m_doc.get("category", "regulations")
+            if category and category.lower() != "all" and doc_cat.lower() != category.lower():
+                continue
+            ftype = m_doc.get("file_type", "MD")
+            if file_type and file_type.lower() != "all" and ftype.upper() != file_type.upper():
+                continue
+            doc_title = m_doc.get("document_title") or m_doc.get("title") or m_id
+            fname = m_doc.get("file_name", m_id)
+            if search:
+                s_low = search.lower()
+                if s_low not in doc_title.lower() and s_low not in fname.lower():
+                    continue
+
+            items.append({
+                "id": m_id,
+                "doc_id": m_id,
+                "title": doc_title,
+                "category": doc_cat,
+                "version": m_doc.get("version", "1.0"),
+                "chunk_count": m_doc.get("chunk_count") or m_doc.get("total_chunks", 1),
+                "page_count": m_doc.get("page_count", 1),
+                "character_count": m_doc.get("character_count", 0),
+                "file_name": fname,
+                "file_type": ftype,
+                "file_size_bytes": m_doc.get("file_size_bytes", 0),
+                "source_type": m_doc.get("source_type", "official_regulation"),
+                "content_hash": m_doc.get("content_hash"),
+                "status": m_doc.get("status", "INDEXED"),
+                "ingested_at": m_doc.get("ingested_at") or m_doc.get("uploaded_at")
+            })
 
     return {
         "total": len(items),
@@ -137,29 +214,39 @@ def get_knowledge_document_detail(
     """
     check_permission(current_user["role"], "search_policies")
     doc = db.query(KnowledgeDocument).filter_by(doc_id=document_id).first()
-    if not doc:
-        raise HTTPException(status_code=404, detail=f"Document with ID '{document_id}' not found.")
-
     manifest_mgr = ManifestManager()
     manifest_meta = manifest_mgr.get_document(document_id) or {}
-    if not manifest_meta and doc.metadata_json:
-        try:
-            manifest_meta = json.loads(doc.metadata_json)
-        except Exception:
-            manifest_meta = {}
+    if not doc and not manifest_meta:
+        raise HTTPException(status_code=404, detail=f"Document with ID '{document_id}' not found.")
+
+    doc_title = (doc.title if doc else None) or manifest_meta.get("document_title") or document_id
+    doc_cat = (doc.category if doc else None) or manifest_meta.get("category", "regulations")
+    doc_ver = (doc.version if doc else None) or manifest_meta.get("version", "1.0")
+    doc_chunks = (doc.chunk_count if doc else None) or manifest_meta.get("chunk_count", 1)
+    doc_content = doc.content if (doc and doc.content) else ""
+
+    # If content is empty, try reading from disk file
+    if not doc_content and manifest_meta.get("file_path"):
+        fp = manifest_meta["file_path"]
+        if os.path.exists(fp):
+            try:
+                with open(fp, "r", encoding="utf-8", errors="ignore") as f:
+                    doc_content = f.read(3500)
+            except Exception:
+                pass
 
     return {
-        "id": doc.id,
-        "doc_id": doc.doc_id,
-        "title": doc.title,
-        "category": doc.category,
-        "version": doc.version,
-        "chunk_count": doc.chunk_count,
-        "content_preview": doc.content[:3500] if doc.content else "",
-        "has_more_content": len(doc.content or "") > 3500,
-        "total_characters": len(doc.content or ""),
+        "id": doc.id if doc else document_id,
+        "doc_id": document_id,
+        "title": doc_title,
+        "category": doc_cat,
+        "version": doc_ver,
+        "chunk_count": doc_chunks,
+        "content_preview": doc_content[:3500] if doc_content else "Official indexed regulatory policy document.",
+        "has_more_content": len(doc_content or "") > 3500,
+        "total_characters": len(doc_content or ""),
         "metadata": manifest_meta,
-        "ingested_at": doc.ingested_at.isoformat() if doc.ingested_at else None
+        "ingested_at": doc.ingested_at.isoformat() if (doc and doc.ingested_at) else manifest_meta.get("ingested_at")
     }
 
 @router.post("/search")
