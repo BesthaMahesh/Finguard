@@ -49,8 +49,8 @@ async def _background_startup_tasks():
         db_chk = SessionLocal()
         tx_count = db_chk.query(Transaction).count()
         db_chk.close()
-        if tx_count == 0:
-            print("[FinGuard] Notice: Database has 0 transactions on startup. Auto-seeding canonical demo data...", flush=True)
+        if tx_count < 10000:
+            print(f"[FinGuard] Notice: Database has {tx_count} transactions (<10,000). Auto-seeding canonical demo data...", flush=True)
             from scripts.seed_database import main as seed_main
             seed_main()
     except Exception as e:

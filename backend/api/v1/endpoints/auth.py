@@ -298,7 +298,7 @@ def trigger_reset_demo_data(
     """Resets platform to clean demo seed state (Admin-only, or permitted if database is currently empty)."""
     norm_role = current_user.get("role", "").upper()
     from backend.db.models import Transaction
-    is_empty = db.query(Transaction).count() == 0
+    is_empty = db.query(Transaction).count() < 10000
     if norm_role not in ("ADMIN", "ADMINISTRATOR") and not is_empty:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

@@ -52,8 +52,12 @@ class DataIngestionPipeline:
                 else:
                     if "isFraud" in df_all.columns:
                         frauds = df_all[df_all["isFraud"] == 1]
-                        normals = df_all[df_all["isFraud"] == 0].sample(n=min(len(df_all) - len(frauds), max_records - len(frauds)), random_state=settings.RANDOM_SEED)
-                        combined = pd.concat([frauds, normals]).sample(frac=1.0, random_state=settings.RANDOM_SEED).reset_index(drop=True)
+                        normals_needed = max(0, min(len(df_all) - len(frauds), max_records - len(frauds)))
+                        if normals_needed > 0:
+                            normals = df_all[df_all["isFraud"] == 0].sample(n=normals_needed, random_state=settings.RANDOM_SEED)
+                            combined = pd.concat([frauds, normals]).sample(frac=1.0, random_state=settings.RANDOM_SEED).reset_index(drop=True)
+                        else:
+                            combined = frauds.iloc[:max_records].copy()
                     else:
                         combined = df_all.sample(n=max_records, random_state=settings.RANDOM_SEED).reset_index(drop=True)
             else:
@@ -97,6 +101,11 @@ class DataIngestionPipeline:
         # Clear existing
         self.db.query(InvestigationCase).delete()
         self.db.query(Transaction).delete()
+        try:
+            from sqlalchemy import text
+            self.db.execute(text("DELETE FROM sqlite_sequence WHERE name IN ('transactions', 'investigation_cases');"))
+        except Exception:
+            pass
         self.db.commit()
 
         base_time = datetime.utcnow() - timedelta(days=7)

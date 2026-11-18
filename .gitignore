@@ -52,6 +52,7 @@ frontend/dist/
 .idea/
 .DS_Store
 Thumbs.db
+scratch/
 
 # Environment variables
 .env

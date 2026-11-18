@@ -8,66 +8,60 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from backend.core.config import settings
 from backend.db.session import engine, SessionLocal
 from backend.db.models import Base, User, ModelMetadata
-from backend.security.jwt_auth import DEMO_USERS
 from backend.data.ingestion import DataIngestionPipeline
+from backend.db.init_users import init_default_accounts
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("seed_database")
 
 def main():
-    logger.info("Creating database tables...")
+    logger.info("Ensuring database tables exist...")
     Base.metadata.create_all(bind=engine)
+
+    # 1. Seed enterprise users idempotently
+    try:
+        init_default_accounts()
+        logger.info("Enterprise accounts verified and initialized.")
+    except Exception as e:
+        logger.warning(f"Default accounts init notice: {e}")
 
     db = SessionLocal()
     try:
-        # Seed users if not existing
-        for username, uinfo in DEMO_USERS.items():
-            existing = db.query(User).filter_by(username=username).first()
-            if not existing:
-                user = User(
-                    id=uinfo["id"],
-                    username=uinfo["username"],
-                    email=uinfo["email"],
-                    hashed_password=uinfo["password_hash"],
-                    full_name=uinfo["full_name"],
-                    role=uinfo["role"],
-                    is_active=True
-                )
-                db.add(user)
-        db.commit()
-        logger.info("Users seeded successfully.")
-
-        # Seed Model Metadata from trained metrics
+        # 2. Seed Model Metadata from trained metrics
         metrics_file = os.path.join(settings.MODEL_ARTIFACTS_DIR, "metrics.json")
         if os.path.exists(metrics_file):
-            with open(metrics_file, "r") as f:
-                metrics_data = json.load(f)
+            try:
+                with open(metrics_file, "r") as f:
+                    metrics_data = json.load(f)
 
-            existing_meta = db.query(ModelMetadata).filter_by(model_version=metrics_data["model_version"]).first()
-            if not existing_meta:
-                meta = ModelMetadata(
-                    model_version=metrics_data["model_version"],
-                    algorithm=metrics_data["algorithm"],
-                    pr_auc=metrics_data["pr_auc"],
-                    roc_auc=metrics_data["roc_auc"],
-                    f1_score=metrics_data["f1_score"],
-                    precision=metrics_data["precision"],
-                    recall=metrics_data["recall"],
-                    threshold=metrics_data["threshold"],
-                    confusion_matrix_json=json.dumps(metrics_data["confusion_matrix"]),
-                    feature_importance_json=json.dumps(metrics_data["feature_importance"]),
-                    is_active=True
-                )
-                db.add(meta)
-                db.commit()
-                logger.info("Model governance metadata registered.")
+                existing_meta = db.query(ModelMetadata).filter_by(model_version=metrics_data["model_version"]).first()
+                if not existing_meta:
+                    meta = ModelMetadata(
+                        model_version=metrics_data["model_version"],
+                        algorithm=metrics_data["algorithm"],
+                        pr_auc=metrics_data["pr_auc"],
+                        roc_auc=metrics_data["roc_auc"],
+                        f1_score=metrics_data["f1_score"],
+                        precision=metrics_data["precision"],
+                        recall=metrics_data["recall"],
+                        threshold=metrics_data["threshold"],
+                        confusion_matrix_json=json.dumps(metrics_data["confusion_matrix"]),
+                        feature_importance_json=json.dumps(metrics_data["feature_importance"]),
+                        is_active=True
+                    )
+                    db.add(meta)
+                    db.commit()
+                    logger.info("Model governance metadata registered.")
+            except Exception as ex:
+                logger.warning(f"Model metadata registration notice: {ex}")
 
-        # Run Data Ingestion from PaySim
+        # 3. Ingest canonical PaySim dataset
         candidate_paths = [
-            settings.DATASET_RAW_PATH,
-            os.path.join("datasets", settings.DATASET_RAW_PATH),
             "datasets/sample_paysim_demo.csv",
             os.path.join(os.path.dirname(__file__), "..", "datasets", "sample_paysim_demo.csv"),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "datasets", "sample_paysim_demo.csv")),
+            settings.DATASET_RAW_PATH,
+            os.path.join("datasets", settings.DATASET_RAW_PATH),
             "sample_paysim_demo.csv"
         ]
         csv_path = None
@@ -77,11 +71,14 @@ def main():
                 break
 
         if csv_path:
+            logger.info(f"Ingesting canonical transactions from {csv_path}...")
             pipeline = DataIngestionPipeline(db)
             res = pipeline.ingest_from_csv(csv_path, max_records=12000)
             logger.info(f"PaySim data seeded: {res['ingested_count']} transactions, {res['cases_created']} cases created from {csv_path}.")
+            return res
         else:
-            logger.warning(f"PaySim raw dataset not found in candidate paths. Transactions table remains empty for manual ingestion.")
+            logger.warning("PaySim raw dataset not found in candidate paths. Transactions table remains unseeded.")
+            return {"ingested_count": 0, "cases_created": 0, "status": "FILE_NOT_FOUND"}
 
     finally:
         db.close()
