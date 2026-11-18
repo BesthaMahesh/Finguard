@@ -67,6 +67,19 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ onNaviga
   const [recentAudits, setRecentAudits] = useState<AuditEvent[]>([]);
   const [priorityTransactions, setPriorityTransactions] = useState<Transaction[]>([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+
+  const handleRestoreDemoData = async () => {
+    try {
+      setIsRestoring(true);
+      await api.resetDemoData();
+      await loadDashboardData();
+    } catch (e: any) {
+      alert(`Failed to seed demo data: ${e.message || e}`);
+    } finally {
+      setIsRestoring(false);
+    }
+  };
 
   const normRole = (userRole || 'USER').toUpperCase();
   const isAdmin = normRole === 'ADMIN' || normRole === 'ADMINISTRATOR';
@@ -201,6 +214,27 @@ export const ExecutiveDashboard: React.FC<ExecutiveDashboardProps> = ({ onNaviga
           </span>
         </div>
       </div>
+
+      {/* Zero State / Unseeded Database Notice */}
+      {summary.total_transactions_processed === 0 && (
+        <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-800/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-start sm:items-center gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5 sm:mt-0" />
+            <div>
+              <div className="text-sm font-semibold text-amber-200">Database Ledger Unseeded (0 Transactions Processed)</div>
+              <div className="text-xs text-slate-400">The cloud database is initialized but currently has 0 ledger entries. Click below to load the canonical 12,000 PaySim transactions and 25 verified investigation cases.</div>
+            </div>
+          </div>
+          <button
+            onClick={handleRestoreDemoData}
+            disabled={isRestoring}
+            className="px-4 py-2 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-500 text-white transition-all flex items-center gap-2 flex-shrink-0 cursor-pointer disabled:opacity-50 shadow-md"
+          >
+            {isRestoring ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4" />}
+            {isRestoring ? 'Seeding Demo Ledger...' : 'Seed 12,000 Transactions'}
+          </button>
+        </div>
+      )}
 
       {/* Summary KPI Cards (Plain Language for Analyst / Executive for Admin) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

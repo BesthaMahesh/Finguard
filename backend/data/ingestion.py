@@ -39,26 +39,44 @@ class DataIngestionPipeline:
             else:
                 combined = df_raw.iloc[:max_records].copy()
         else:
-            fraud_chunks = []
-            normal_chunks = []
-            rows_scanned = 0
+            # If the CSV is compact (e.g. sample_paysim_demo.csv <= 15000 rows, < 20MB), read directly
+            try:
+                file_size_mb = os.path.getsize(csv_path) / (1024 * 1024)
+            except Exception:
+                file_size_mb = 100.0
 
-            for chunk in pd.read_csv(csv_path, chunksize=50000):
-                frauds = chunk[chunk["isFraud"] == 1] if "isFraud" in chunk.columns else pd.DataFrame()
-                normals = chunk[chunk["isFraud"] == 0] if "isFraud" in chunk.columns else chunk
+            if file_size_mb < 20.0:
+                df_all = pd.read_csv(csv_path)
+                if len(df_all) <= max_records:
+                    combined = df_all.copy()
+                else:
+                    if "isFraud" in df_all.columns:
+                        frauds = df_all[df_all["isFraud"] == 1]
+                        normals = df_all[df_all["isFraud"] == 0].sample(n=min(len(df_all) - len(frauds), max_records - len(frauds)), random_state=settings.RANDOM_SEED)
+                        combined = pd.concat([frauds, normals]).sample(frac=1.0, random_state=settings.RANDOM_SEED).reset_index(drop=True)
+                    else:
+                        combined = df_all.sample(n=max_records, random_state=settings.RANDOM_SEED).reset_index(drop=True)
+            else:
+                fraud_chunks = []
+                normal_chunks = []
+                rows_scanned = 0
 
-                if not frauds.empty:
-                    fraud_chunks.append(frauds)
-                sample_normals = normals.sample(n=min(len(normals), 2000), random_state=settings.RANDOM_SEED)
-                normal_chunks.append(sample_normals)
+                for chunk in pd.read_csv(csv_path, chunksize=50000):
+                    frauds = chunk[chunk["isFraud"] == 1] if "isFraud" in chunk.columns else pd.DataFrame()
+                    normals = chunk[chunk["isFraud"] == 0] if "isFraud" in chunk.columns else chunk
 
-                rows_scanned += len(chunk)
-                if rows_scanned >= 300000 or (len(pd.concat(fraud_chunks)) > 300 if fraud_chunks else False):
-                    break
+                    if not frauds.empty:
+                        fraud_chunks.append(frauds)
+                    sample_normals = normals.sample(n=min(len(normals), 2000), random_state=settings.RANDOM_SEED)
+                    normal_chunks.append(sample_normals)
 
-            df_fraud = pd.concat(fraud_chunks) if fraud_chunks else pd.DataFrame()
-            df_normal = pd.concat(normal_chunks) if normal_chunks else pd.DataFrame()
-            combined = pd.concat([df_fraud, df_normal]).sample(frac=1.0, random_state=settings.RANDOM_SEED).reset_index(drop=True)
+                    rows_scanned += len(chunk)
+                    if rows_scanned >= 300000 or (len(pd.concat(fraud_chunks)) > 300 if fraud_chunks else False):
+                        break
+
+                df_fraud = pd.concat(fraud_chunks) if fraud_chunks else pd.DataFrame()
+                df_normal = pd.concat(normal_chunks) if normal_chunks else pd.DataFrame()
+                combined = pd.concat([df_fraud, df_normal]).sample(frac=1.0, random_state=settings.RANDOM_SEED).reset_index(drop=True)
 
         if len(combined) > max_records:
             combined = combined.iloc[:max_records]

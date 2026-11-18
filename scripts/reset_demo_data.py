@@ -52,8 +52,14 @@ def reset_demo_data() -> dict:
         db.execute(text("UPDATE investigation_cases SET is_test = 0 WHERE is_test IS NULL OR is_test = 'False'"))
         db.commit()
 
-        # 2. Re-verify transaction and case counts
+        # 2. Re-verify transaction and case counts (auto-seed if empty)
         total_tx = db.query(Transaction).count()
+        if total_tx == 0:
+            print("[FinGuard] Warning: Database has 0 transactions. Automatically seeding default PaySim data...", flush=True)
+            from scripts.seed_database import main as seed_main
+            seed_main()
+            total_tx = db.query(Transaction).count()
+
         historical_tx = db.query(Transaction).filter(Transaction.id <= 12000).count()
         total_cases = db.query(InvestigationCase).count()
         open_cases = db.query(InvestigationCase).filter(InvestigationCase.status == "OPEN").count()

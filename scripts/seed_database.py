@@ -63,13 +63,25 @@ def main():
                 logger.info("Model governance metadata registered.")
 
         # Run Data Ingestion from PaySim
-        csv_path = settings.DATASET_RAW_PATH
-        if os.path.exists(csv_path):
+        candidate_paths = [
+            settings.DATASET_RAW_PATH,
+            os.path.join("datasets", settings.DATASET_RAW_PATH),
+            "datasets/sample_paysim_demo.csv",
+            os.path.join(os.path.dirname(__file__), "..", "datasets", "sample_paysim_demo.csv"),
+            "sample_paysim_demo.csv"
+        ]
+        csv_path = None
+        for p in candidate_paths:
+            if p and os.path.exists(p):
+                csv_path = p
+                break
+
+        if csv_path:
             pipeline = DataIngestionPipeline(db)
             res = pipeline.ingest_from_csv(csv_path, max_records=12000)
-            logger.info(f"PaySim data seeded: {res['ingested_count']} transactions, {res['cases_created']} cases created.")
+            logger.info(f"PaySim data seeded: {res['ingested_count']} transactions, {res['cases_created']} cases created from {csv_path}.")
         else:
-            logger.warning(f"PaySim raw dataset not found at {csv_path}. Transactions table remains empty for manual ingestion.")
+            logger.warning(f"PaySim raw dataset not found in candidate paths. Transactions table remains empty for manual ingestion.")
 
     finally:
         db.close()

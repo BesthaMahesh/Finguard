@@ -111,6 +111,19 @@ export const TransactionIntelligence: React.FC<TransactionIntelligenceProps> = (
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [drawerError, setDrawerError] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  const handleSeedDemoData = async () => {
+    try {
+      setIsSeeding(true);
+      await api.resetDemoData();
+      await fetchTransactions();
+    } catch (e: any) {
+      alert(`Failed to seed demo transactions: ${e.message || e}`);
+    } finally {
+      setIsSeeding(false);
+    }
+  };
 
   // Filter & Pagination States
   const [search, setSearch] = useState('');
@@ -301,8 +314,12 @@ export const TransactionIntelligence: React.FC<TransactionIntelligenceProps> = (
           </div>
         ) : transactions.length === 0 ? (
           <EmptyState
-            title="No Transactions Match Filters"
-            description="Adjust your typology, risk tier, or search keyword to review ledger records."
+            title={total === 0 && !search && !typeFilter && !riskFilter ? "Ledger Unseeded (0 Transactions)" : "No Transactions Match Filters"}
+            description={total === 0 && !search && !typeFilter && !riskFilter ? "The database is initialized but currently has 0 transactions. Click below to load the canonical 12,000 PaySim transactions." : "Adjust your typology, risk tier, or search keyword to review ledger records."}
+            action={total === 0 && !search && !typeFilter && !riskFilter ? {
+              label: isSeeding ? "Seeding 12,000 Transactions..." : "Seed Demo Ledger (12,000 Tx)",
+              onClick: handleSeedDemoData
+            } : undefined}
           />
         ) : (
           <div className="rounded-xl bg-[#11192e] border border-slate-800/80 overflow-hidden shadow-sm">

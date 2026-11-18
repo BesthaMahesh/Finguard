@@ -292,17 +292,26 @@ def reset_user_password(
 
 @router.post("/reset-demo-data")
 def trigger_reset_demo_data(
-    admin_user: dict = Depends(require_admin),
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Admin-only endpoint to reset platform to clean demo seed state."""
+    """Resets platform to clean demo seed state (Admin-only, or permitted if database is currently empty)."""
+    norm_role = current_user.get("role", "").upper()
+    from backend.db.models import Transaction
+    is_empty = db.query(Transaction).count() == 0
+    if norm_role not in ("ADMIN", "ADMINISTRATOR") and not is_empty:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Resetting populated demo data requires Administrator privileges."
+        )
+
     from scripts.reset_demo_data import reset_demo_data
     result = reset_demo_data()
 
     _record_audit_log(
         db,
-        actor_id=admin_user["username"],
-        actor_role=admin_user["role"],
+        actor_id=current_user["username"],
+        actor_role=current_user["role"],
         action="DEMO_DATA_RESET",
         target_type="DATABASE",
         target_id="finguard.db",

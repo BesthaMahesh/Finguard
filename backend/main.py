@@ -43,6 +43,19 @@ async def _background_startup_tasks():
     except Exception as e:
         print(f"[FinGuard] Warning: ML model initialization skipped: {e}", flush=True)
 
+    try:
+        from backend.db.session import SessionLocal
+        from backend.db.models import Transaction
+        db_chk = SessionLocal()
+        tx_count = db_chk.query(Transaction).count()
+        db_chk.close()
+        if tx_count == 0:
+            print("[FinGuard] Notice: Database has 0 transactions on startup. Auto-seeding canonical demo data...", flush=True)
+            from scripts.seed_database import main as seed_main
+            seed_main()
+    except Exception as e:
+        print(f"[FinGuard] Warning: Automated demo seed on startup: {e}", flush=True)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Synchronous essential startup (table structure)
